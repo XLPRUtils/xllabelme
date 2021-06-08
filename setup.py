@@ -31,11 +31,13 @@ def get_install_requires():
     PY2 = sys.version_info[0] == 2
     assert PY3 or PY2
 
+    # 试了py3.6、py3.8，都是能编译exe成功的
     install_requires = [
         "pyxllib",
-        # "imgviz==1.2.1",
+        # "imgviz==1.2.1",  # 这个限定不用，新版imgviz又兼容了
         "imgviz",
         "matplotlib<3.3",  # for PyInstaller
+        # "matplotlib",  # 这个版本确实不能升，会有问题，先不要改
         "numpy",
         "Pillow>=2.8.0",
         "PyYAML",
