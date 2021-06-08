@@ -7,8 +7,8 @@ import os.path as osp
 import imgviz
 import PIL.Image
 
-from labelme.logger import logger
-from labelme import utils
+from xllabelme.logger import logger
+from xllabelme import utils
 
 
 def main():

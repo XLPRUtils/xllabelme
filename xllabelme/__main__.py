@@ -9,11 +9,11 @@ import yaml
 from qtpy import QtCore
 from qtpy import QtWidgets
 
-from labelme import __appname__, __appname, __version__
-from labelme.app import *
-from labelme.config import get_config
-from labelme.logger import logger
-from labelme.utils import newIcon
+from xllabelme import __appname__, __appname, __version__
+from xllabelme.app import *
+from xllabelme.config import get_config
+from xllabelme.logger import logger
+from xllabelme.utils import newIcon
 
 
 def default_argument_parser():

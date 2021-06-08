@@ -1,8 +1,8 @@
 import json
 import os.path as osp
 
-from labelme.utils import image as image_module
-from labelme.utils import shape as shape_module
+from xllabelme.utils import image as image_module
+from xllabelme.utils import shape as shape_module
 
 
 here = osp.dirname(osp.abspath(__file__))

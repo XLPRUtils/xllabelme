@@ -15,26 +15,26 @@ from qtpy import QtGui
 from qtpy import QtWidgets
 from qtpy.QtWidgets import QInputDialog
 
-import labelme
-from labelme import __appname__
-from labelme import PY2
-from labelme import QT5
+import xllabelme
+from xllabelme import __appname__
+from xllabelme import PY2
+from xllabelme import QT5
 
 from . import utils
-from labelme.config import get_config
-from labelme.label_file import LabelFile
-from labelme.label_file import LabelFileError
-from labelme.logger import logger
-from labelme.shape import Shape
-from labelme.widgets import BrightnessContrastDialog
-from labelme.widgets import Canvas
-from labelme.widgets import DefaultLabelDialog, LabelDialogExt
-from labelme.widgets import LabelListWidget
-from labelme.widgets import LabelListWidgetItem
-from labelme.widgets import ToolBar
-from labelme.widgets import UniqueLabelQListWidget
-from labelme.widgets import ZoomWidget
-from labelme.config import itemcfg
+from xllabelme.config import get_config
+from xllabelme.label_file import LabelFile
+from xllabelme.label_file import LabelFileError
+from xllabelme.logger import logger
+from xllabelme.shape import Shape
+from xllabelme.widgets import BrightnessContrastDialog
+from xllabelme.widgets import Canvas
+from xllabelme.widgets import DefaultLabelDialog, LabelDialogExt
+from xllabelme.widgets import LabelListWidget
+from xllabelme.widgets import LabelListWidgetItem
+from xllabelme.widgets import ToolBar
+from xllabelme.widgets import UniqueLabelQListWidget
+from xllabelme.widgets import ZoomWidget
+from xllabelme.config import itemcfg
 
 from pyxllib.gui.qt import XlActionFunc, GetItemsAction
 
@@ -2812,7 +2812,7 @@ class XlMainWindow(MainWindow):
                 super().__call__(checked)
                 self.parent.updateLabelListItems()
 
-        self.labelcfg = LabelCfg(self, 'attr属性配置', labelme.config.itemcfg.COCO)
+        self.labelcfg = LabelCfg(self, 'attr属性配置', xllabelme.config.itemcfg.COCO)
         self.label_editable = XlActionFunc(self, '字典格式label可编辑', checked=False)
         self.label_shape_color = ColorCfg(self, 'hashlabel/shape_color',
                                           'category_id,category_name,content_class'.split(','))

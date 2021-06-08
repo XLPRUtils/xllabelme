@@ -15,10 +15,10 @@ from setuptools import setup
 
 
 def get_version():
-    filename = "labelme/__init__.py"
+    filename = "xllabelme/__init__.py"
     with open(filename, encoding='utf8') as f:
         match = re.search(
-            r"""^__version__ = ['"]([^'"]*)['"]""", f.read(), re.M
+            r"""^__appname__ = ['"]xllabelme v([^'"]*)['"]""", f.read(), re.M
         )
     if not match:
         raise RuntimeError("{} doesn't contain __version__".format(filename))
@@ -33,7 +33,8 @@ def get_install_requires():
 
     install_requires = [
         "pyxllib",
-        "imgviz==1.2.1",
+        # "imgviz==1.2.1",
+        "imgviz",
         "matplotlib<3.3",  # for PyInstaller
         "numpy",
         "Pillow>=2.8.0",
@@ -123,15 +124,15 @@ def main():
         sys.exit(0)
 
     setup(
-        name="labelme",
+        name="xllabelme",
         version=version,
         packages=find_packages(exclude=["github2pypi"]),
         description="Image Polygonal Annotation with Python",
         long_description=get_long_description(),
         long_description_content_type="text/markdown",
-        author="Kentaro Wada",
-        author_email="www.kentaro.wada@gmail.com",
-        url="https://github.com/wkentaro/labelme",
+        author="code4101",
+        author_email="877362867@qq.com",
+        url="https://github.com/XLPRUtils/xllabelme",
         install_requires=get_install_requires(),
         license="GPLv3",
         keywords="Image Annotation, Machine Learning",

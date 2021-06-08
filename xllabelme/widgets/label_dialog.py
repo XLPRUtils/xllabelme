@@ -5,10 +5,10 @@ from qtpy import QtCore
 from qtpy import QtGui
 from qtpy import QtWidgets
 from qtpy.QtWidgets import QWidgetItem
-from labelme.logger import logger
-import labelme.utils
-from labelme.config.itemcfg import *
-from labelme.shape import ShapeExt
+from xllabelme.logger import logger
+import xllabelme.utils
+from xllabelme.config.itemcfg import *
+from xllabelme.shape import ShapeExt
 
 from pyxllib.gui.qt import get_input_widget, QHLine
 
@@ -49,7 +49,7 @@ class DefaultLabelDialog(QtWidgets.QDialog):
         super(DefaultLabelDialog, self).__init__(parent)
         self.edit = LabelQLineEdit()
         self.edit.setPlaceholderText(text)
-        self.edit.setValidator(labelme.utils.labelValidator())
+        self.edit.setValidator(xllabelme.utils.labelValidator())
         self.edit.editingFinished.connect(self.postProcess)
         if flags:
             self.edit.textChanged.connect(self.updateFlags)
@@ -70,8 +70,8 @@ class DefaultLabelDialog(QtWidgets.QDialog):
             QtCore.Qt.Horizontal,
             self,
         )
-        bb.button(bb.Ok).setIcon(labelme.utils.newIcon("done"))
-        bb.button(bb.Cancel).setIcon(labelme.utils.newIcon("undo"))
+        bb.button(bb.Ok).setIcon(xllabelme.utils.newIcon("done"))
+        bb.button(bb.Cancel).setIcon(xllabelme.utils.newIcon("undo"))
         bb.accepted.connect(self.validate)
         bb.rejected.connect(self.reject)
         layout.addWidget(bb)
@@ -261,7 +261,7 @@ class LabelDialogExt(DefaultLabelDialog):
         self.setWindowTitle(f'view/edit label[*]')
         self.edit = LabelQLineEdit()
         self.edit.setPlaceholderText(text)
-        self.edit.setValidator(labelme.utils.labelValidator())
+        self.edit.setValidator(xllabelme.utils.labelValidator())
         self.edit.editingFinished.connect(self.postProcess)
         if flags:
             self.edit.textChanged.connect(self.updateFlags)
@@ -284,8 +284,8 @@ class LabelDialogExt(DefaultLabelDialog):
             QtCore.Qt.Horizontal,
             self,
         )
-        bb.button(bb.Ok).setIcon(labelme.utils.newIcon("done"))
-        bb.button(bb.Cancel).setIcon(labelme.utils.newIcon("undo"))
+        bb.button(bb.Ok).setIcon(xllabelme.utils.newIcon("done"))
+        bb.button(bb.Cancel).setIcon(xllabelme.utils.newIcon("undo"))
         bb.accepted.connect(self.validate)
         bb.rejected.connect(self.reject)
         bb.setProperty('labelme origin layout', True)

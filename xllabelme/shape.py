@@ -5,8 +5,8 @@ import math
 from qtpy import QtCore
 from qtpy import QtGui
 
-from labelme import __appname
-import labelme.utils
+from xllabelme import __appname
+import xllabelme.utils
 from pyxllib.algo.pupil import make_index_function
 from pyxllib.prog.pupil import DictTool
 
@@ -211,7 +211,7 @@ class DefaultShape(object):
         min_distance = float("inf")
         min_i = None
         for i, p in enumerate(self.points):
-            dist = labelme.utils.distance(p - point)
+            dist = xllabelme.utils.distance(p - point)
             if dist <= epsilon and dist < min_distance:
                 min_distance = dist
                 min_i = i
@@ -222,7 +222,7 @@ class DefaultShape(object):
         post_i = None
         for i in range(len(self.points)):
             line = [self.points[i - 1], self.points[i]]
-            dist = labelme.utils.distancetoline(point, line)
+            dist = xllabelme.utils.distancetoline(point, line)
             if dist <= epsilon and dist < min_distance:
                 min_distance = dist
                 post_i = i
