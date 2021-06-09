@@ -15,14 +15,15 @@ from setuptools import setup
 
 
 def get_version():
-    filename = "xllabelme/__init__.py"
-    with open(filename, encoding='utf8') as f:
-        match = re.search(
-            r"""^__appname__ = ['"]xllabelme v([^'"]*)['"]""", f.read(), re.M
-        )
-    if not match:
-        raise RuntimeError("{} doesn't contain __version__".format(filename))
-    version = match.groups()[0]
+    # filename = "xllabelme/__init__.py"
+    # with open(filename, encoding='utf8') as f:
+    #     match = re.search(
+    #         r"""^__appname__ = ['"]xllabelme v([^'"]*)['"]""", f.read(), re.M
+    #     )
+    # if not match:
+    #     raise RuntimeError("{} doesn't contain __version__".format(filename))
+    # version = match.groups()[0]
+    version = '1.7.2'
     return version
 
 

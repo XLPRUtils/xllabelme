@@ -2815,11 +2815,11 @@ class XlMainWindow(MainWindow):
         self.labelcfg = LabelCfg(self, 'attr属性配置', xllabelme.config.itemcfg.COCO)
         self.label_editable = XlActionFunc(self, '字典格式label可编辑', checked=False)
         self.label_shape_color = ColorCfg(self, 'hashlabel/shape_color',
-                                          'category_id,category_name,content_class'.split(','))
+                                          'category_id,content_class'.split(','))
         self.label_line_color = ColorCfg(self, 'line_color',
                                          'gt_category_id,gt_category_name'.split(','))
         self.label_vertex_fill_color = ColorCfg(self, 'vertex_fill_color',
-                                                'dt_category_id,dt_category_name,content_kv'.split(','))
+                                                'dt_category_id,dt_category_name'.split(','))
 
         # 3 增加菜单选项
         utils.addActions(
@@ -2985,8 +2985,11 @@ class XlMainWindow(MainWindow):
 
     def _get_rgb_by_label(self, label):
         if self._config["shape_color"] == "auto":
-            item = self.uniqLabelList.findItemsByLabel(label)[0]
-            label_id = self.uniqLabelList.indexFromItem(item).row() + 1
+            try:
+                item = self.uniqLabelList.findItemsByLabel(label)[0]
+                label_id = self.uniqLabelList.indexFromItem(item).row() + 1
+            except IndexError:
+                label_id = 0
             label_id += self._config["shift_auto_shape_color"]
             return self.LABEL_COLORMAP[label_id % len(self.LABEL_COLORMAP)]
         elif (

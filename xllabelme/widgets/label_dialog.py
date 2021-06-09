@@ -435,7 +435,7 @@ class LabelDialogExt(DefaultLabelDialog):
                 # label 字段特殊处理
                 n = self.labelList.count()
                 texts = [self.labelList.item(i).text() for i in range(n)]
-                texts = [x for x in texts if (x[0] != '{' and x[-1] != '}')]
+                texts = [x for x in texts if (x and x[0] != '{' and x[-1] != '}')]
                 v = v.copy()
                 v['items'] = texts
                 add_row(k, v) if texts else add_row(k)
