@@ -30,6 +30,7 @@ COCO = [
     ['image_id', 0],
     ['segmentation', 0],
     ['iscrowd', 0],
+    ['points', 0, 'list'],
     ['shape_color', 0, 'list'],
     ['line_color', 0, 'list'],
     ['vertex_color', 0, 'list'],
