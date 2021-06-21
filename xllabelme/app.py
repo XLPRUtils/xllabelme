@@ -2765,8 +2765,16 @@ class XlMainWindow(MainWindow):
         class LabelCfg(XlActionFunc):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
-                self.origin_value = self.value
+                self.origin_value = self.value  # 备份一个原始配置
                 self.update_keyidx()
+
+                # 如果有配置文件，则读取配置
+                self.configpath = osp.join(osp.expanduser("~"), ".xllabelme_labelcfg")
+                if osp.isfile(self.configpath):
+                    with open(self.configpath, 'r', encoding='utf8') as f:
+                        self.value = json.load(f)
+                    self.update_keyidx()
+                    self.update_items()
 
             def update_keyidx(self):
                 self.keyidx = {x['key']: i for i, x in enumerate(self.value)}
@@ -2805,6 +2813,11 @@ class XlMainWindow(MainWindow):
                     self.value = json.loads(inputs[0])
                     self.update_keyidx()
                     self.update_items()
+
+                    # 保存到文件
+                    with open(self.configpath, 'w', encoding='utf8') as f:
+                        json.dump(self.value, f, indent=2, ensure_ascii=False)
+
                 self.parent.updateLabelListItems()
 
         class ColorCfg(GetItemsAction):

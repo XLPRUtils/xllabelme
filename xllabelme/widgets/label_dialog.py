@@ -445,8 +445,11 @@ class LabelDialogExt(DefaultLabelDialog):
                 else:
                     items, cvt = None, None
 
-                w = get_input_widget(items, labelattr[k], valcvt=cvt,
-                                     text_changed=lambda x: edit_label(k, x))
+                cur_value = labelattr[k]
+                if cur_value is None:
+                    cur_value = 'None'
+                w = get_input_widget(items, cur_value, valcvt=cvt,
+                                     correct_changed=lambda x: edit_label(k, x))
                 layout.insertRow(n_row, k, w)
                 n_row += 1
 
