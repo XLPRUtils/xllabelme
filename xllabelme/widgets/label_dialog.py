@@ -1,4 +1,5 @@
 import re
+import json
 
 from qtpy import QT_VERSION
 from qtpy import QtCore
@@ -467,15 +468,17 @@ class LabelDialogExt(DefaultLabelDialog):
                 keys_group[2].append(k)
         # 2.3.2
         for g in [1, 2, 0]:  # 展示每组的顺序
-            layout.insertRow(n_row, QHLine())  # 加分割线
-            n_row += 1
-            for k in keys_group[g]:
-                add_row(k, cfg.get(k, None))
+            if keys_group[g]:
+                layout.insertRow(n_row, QHLine())  # 加分割线
+                n_row += 1
+                for k in keys_group[g]:
+                    add_row(k, cfg.get(k, None))
         layout.insertRow(n_row, QHLine())
 
     def popUp2(self, shape, mainwin=None):
         # 1 初始化
         text, flags, group_id = shape.label, shape.flags, shape.group_id
+
         if self._fit_to_content["row"]:
             self.labelList.setMinimumHeight(
                 self.labelList.sizeHintForRow(0) * self.labelList.count() + 2

@@ -8,6 +8,7 @@ import os.path as osp
 import re
 import webbrowser
 
+import numpy as np
 import imgviz
 from qtpy import QtCore
 from qtpy.QtCore import Qt
@@ -1298,10 +1299,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Callback functions:
 
-    def newShape(self):
+    def newShape(self, dictmode=True):
         """Pop-up and give focus to the label editor.
 
         position MUST be in global coordinates.
+
+        :param dictmode: ckz，新增模式，默认情况新增的shape是普通的文本label
+            启用dictmode，则默认会变成新建字典的格式
+            注意此时要配置字典的默认属性
         """
         items = self.uniqLabelList.selectedItems()
         text = None
@@ -1311,7 +1316,15 @@ class MainWindow(QtWidgets.QMainWindow):
         group_id = None
         if self._config["display_label_popup"] or not text:
             previous_text = self.labelDialog.edit.text()
-            text, flags, group_id = self.labelDialog.popUp(text)
+            if dictmode:  # ckz
+                shape = Shape()
+                shape.label = json.dumps({'text': '', 'type': '印刷体'}, ensure_ascii=False)
+                shape = self.labelDialog.popUp2(shape, self)
+                if shape is not None:
+                    text, flags, group_id = shape.label, shape.flags, shape.group_id
+            else:
+                text, flags, group_id = self.labelDialog.popUp(text)
+
             if not text:
                 self.labelDialog.edit.setText(previous_text)
 
@@ -2763,14 +2776,14 @@ class XlMainWindow(MainWindow):
 
     def config_menu_label(self):
         class LabelCfg(XlActionFunc):
-            def __init__(self, *args, **kwargs):
+            def __init__(self, *args, read_exists_cfg=True, **kwargs):
                 super().__init__(*args, **kwargs)
                 self.origin_value = self.value  # 备份一个原始配置
                 self.update_keyidx()
 
                 # 如果有配置文件，则读取配置
                 self.configpath = osp.join(osp.expanduser("~"), ".xllabelme_labelcfg")
-                if osp.isfile(self.configpath):
+                if osp.isfile(self.configpath) and read_exists_cfg:
                     with open(self.configpath, 'r', encoding='utf8') as f:
                         self.value = json.load(f)
                     self.update_keyidx()
@@ -2825,10 +2838,12 @@ class XlMainWindow(MainWindow):
                 super().__call__(checked)
                 self.parent.updateLabelListItems()
 
-        self.labelcfg = LabelCfg(self, 'attr属性配置', xllabelme.config.itemcfg.COCO)
+        # self.labelcfg = LabelCfg(self, 'attr属性配置', xllabelme.config.itemcfg.COCO)
+        self.labelcfg = LabelCfg(self, 'attr属性配置', xllabelme.config.itemcfg.RELABEL2, read_exists_cfg=False)
         self.label_editable = XlActionFunc(self, '字典格式label可编辑', checked=False)
-        self.label_shape_color = ColorCfg(self, 'hashlabel/shape_color',
-                                          'category_id,content_class'.split(','))
+        # self.label_shape_color = ColorCfg(self, 'hashlabel/shape_color',
+        #                                   'category_id,content_class'.split(','))
+        self.label_shape_color = ColorCfg(self, 'hashlabel/shape_color', ['type'])
         self.label_line_color = ColorCfg(self, 'line_color',
                                          'gt_category_id,gt_category_name'.split(','))
         self.label_vertex_fill_color = ColorCfg(self, 'vertex_fill_color',
@@ -2997,6 +3012,13 @@ class XlMainWindow(MainWindow):
         return label_list_item
 
     def _get_rgb_by_label(self, label):
+        """ 该函数可以强制限定某些映射颜色 """
+        # ckz relabel2项目定制映射
+        colors = {'印刷体': (0, 255, 0), '手写体': (255, 255, 0), '印章': (255, 0, 0)}
+        if label in colors:
+            return np.array(colors[label], dtype='uint8')
+
+        # 原来的颜色配置代码
         if self._config["shape_color"] == "auto":
             try:
                 item = self.uniqLabelList.findItemsByLabel(label)[0]

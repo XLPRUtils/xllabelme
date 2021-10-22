@@ -36,6 +36,11 @@ COCO = [
     ['vertex_color', 0, 'list'],
 ]
 
+RELABEL2 = [
+    ['text', 1, 'str'],
+    ['type', 1, 'str', ('印刷体', '手写体', '印章')]
+]
+
 
 def _py2ls(ls):
     """
@@ -57,3 +62,4 @@ def _py2ls(ls):
 
 
 COCO = _py2ls(COCO)
+RELABEL2 = _py2ls(RELABEL2)
