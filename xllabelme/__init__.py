@@ -11,10 +11,14 @@ from qtpy import QT_VERSION
 
 # 1 官方原版labelme
 # __appname__ = "labelme v4.5.7"
-__version__ = "4.5.7"
+# Semantic Versioning 2.0.0: https://semver.org/
+# 1. MAJOR version when you make incompatible API changes;
+# 2. MINOR version when you add functionality in a backwards-compatible manner;
+# 3. PATCH version when you make backwards-compatible bug fixes.
+__version__ = "5.0.1"
 
 # 2 扩展的更灵活的labelme，兼容官方的功能，但有更强的可视化效果，能查看shape的多个属性值
-__appname__ = "xllabelme v1.8.2 relabel2专用"
+__appname__ = "xllabelme v1.8.3"
 
 # 开头的xllabelme不要改，这里就能自动匹配到
 __appname = re.match(r'\w+', __appname__).group()

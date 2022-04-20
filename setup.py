@@ -36,13 +36,14 @@ def get_install_requires():
     install_requires = [
         "pyxllib",
         # "imgviz==1.2.1",  # 这个限定不用，新版imgviz又兼容了
-        "imgviz",
+        "imgviz>=0.11",
         "matplotlib<3.3",  # for PyInstaller
         # "matplotlib",  # 这个版本确实不能升，会有问题，先不要改
+		"natsort>=7.1.0",
         "numpy",
-        "Pillow>=2.8.0",
+        "Pillow>=2.8",
         "PyYAML",
-        "qtpy",
+        "qtpy!=1.11.2",
         "termcolor",
     ]
 
@@ -67,22 +68,11 @@ def get_install_requires():
             pass
 
     if QT_BINDING is None:
-        try:
-            import PyQt4  # NOQA
+        # PyQt5 can be installed via pip for Python3
+        # 5.15.3, 5.15.4 won't work with PyInstaller
+        install_requires.append("PyQt5!=5.15.3,!=5.15.4")
+        QT_BINDING = "pyqt5"
 
-            QT_BINDING = "pyqt4"
-        except ImportError:
-            if PY2:
-                print(
-                    "Please install PyQt5, PySide2 or PyQt4 for Python2.\n"
-                    "Note that PyQt5 can be installed via pip for Python3.",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            assert PY3
-            # PyQt5 can be installed via pip for Python3
-            install_requires.append("PyQt5")
-            QT_BINDING = "pyqt5"
     del QT_BINDING
 
     if os.name == "nt":  # Windows
@@ -95,12 +85,14 @@ def get_long_description():
     with open("README.md") as f:
         long_description = f.read()
     try:
+        # when this package is being released
         import github2pypi
 
         return github2pypi.replace_url(
-            slug="wkentaro/labelme", content=long_description
+            slug="wkentaro/labelme", content=long_description, branch="main"
         )
-    except Exception:
+    except ImportError:
+        # when this package is being installed
         return long_description
 
 
@@ -108,6 +100,15 @@ def main():
     version = get_version()
 
     if sys.argv[1] == "release":
+        try:
+            import github2pypi  # NOQA
+        except ImportError:
+            print(
+                "Please install github2pypi\n\n\tpip install github2pypi\n",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
         if not distutils.spawn.find_executable("twine"):
             print(
                 "Please install twine:\n\n\tpip install twine\n",
@@ -116,13 +117,14 @@ def main():
             sys.exit(1)
 
         commands = [
-            "python tests/docs_tests/man_tests/test_labelme_1.py",
+            "git push origin main",
             "git tag v{:s}".format(version),
-            "git push origin master --tag",
+            "git push origin --tags",
             "python setup.py sdist",
             "twine upload dist/labelme-{:s}.tar.gz".format(version),
         ]
         for cmd in commands:
+            print("+ {:s}".format(cmd))
             subprocess.check_call(shlex.split(cmd))
         sys.exit(0)
 
@@ -133,7 +135,7 @@ def main():
         description="Image Polygonal Annotation with Python",
         long_description=get_long_description(),
         long_description_content_type="text/markdown",
-        author="code4101",
+        author="code4101,Kentaro Wada",
         author_email="877362867@qq.com",
         url="https://github.com/XLPRUtils/xllabelme",
         install_requires=get_install_requires(),
@@ -142,14 +144,16 @@ def main():
         classifiers=[
             "Development Status :: 5 - Production/Stable",
             "Intended Audience :: Developers",
+            "Intended Audience :: Science/Research",
             "Natural Language :: English",
+            "Operating System :: OS Independent",
             "Programming Language :: Python",
-            "Programming Language :: Python :: 2.7",
             "Programming Language :: Python :: 3.5",
             "Programming Language :: Python :: 3.6",
             "Programming Language :: Python :: 3.7",
-            "Programming Language :: Python :: Implementation :: CPython",
-            "Programming Language :: Python :: Implementation :: PyPy",
+            "Programming Language :: Python :: 3.8",
+            "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3 :: Only",
         ],
         package_data={"xllabelme": ["icons/*", "config/*.yaml"]},
         entry_points={
