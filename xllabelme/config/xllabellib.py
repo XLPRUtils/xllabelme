@@ -1,11 +1,15 @@
 import json
 import os.path as osp
+import time
 
-from PyQt5.QtWidgets import QInputDialog
+from PyQt5.QtCore import QPointF
+from PyQt5.QtWidgets import QMenu, QAction
 
-from pyxllib.xl import XlPath
+from pyxllib.file.specialist import XlPath
+from pyxllib.algo.geo import rect_bounds
 from pyxllib.algo.pupil import make_index_function
 from pyxllib.prog.pupil import DictTool
+from pyxllib.gui.qt import WaitMessageBox
 
 from xllabelme import utils
 
@@ -27,7 +31,9 @@ _CONFIGS = {
              [['text', 1, 'str'],
               ["content_class", 1, "str", ("其它类", "姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果")],
               ['content_kv', 1, 'str', ('key', 'value')],
-              ]
+              ],
+         'label_shape_color': 'content_class'.split(','),
+         'default_label': json.dumps({'text': '', 'content_class': '其它类', 'content_kv': 'value'}, ensure_ascii=False),
          },
     'XlCoco': {
         '_attrs':
@@ -61,9 +67,9 @@ _CONFIGS = {
 }
 
 
-class LabelCfg:
+class XlLabel:
     def __init__(self, parent):
-        self.parent = parent
+        self.mainwin = parent
         self.configpath = XlPath.userdir() / ".xllabelme_labelcfg"
         if self.configpath.is_file():
             self.meta_cfg = self.configpath.read_json()
@@ -71,9 +77,14 @@ class LabelCfg:
             self.meta_cfg = {'current_mode': 'xllabelme',
                              'custom_modes': {}
                              }
+
+        # 新建框的时候，是否自动识别文本内容
+        self.auto_rec_text = False
+        self.cur_img = {}  # 存储当前图片的ndarray数据。只有一条数据，k=图片路径，v=图片数据
+
         # 这里可以配置显示哪些可用项目标注，有时候可能会需要定制化
         self.reset()
-        self.config_menu_label()  # 配置界面
+        # self.config_label_menu()  # 配置界面
 
     def reset(self, mode=None):
         # 1 确定mode
@@ -82,7 +93,7 @@ class LabelCfg:
         mode = self.meta_cfg['current_mode']
 
         # 2 预设mode或自定义mode的详细配置
-        cfg = {
+        default_cfg = {
             'attrs': [],
             'autodict': True,
             'editable': False,
@@ -92,9 +103,9 @@ class LabelCfg:
         }
 
         if mode in _CONFIGS:
-            cfg2 = _CONFIGS[mode]
+            cfg = _CONFIGS[mode]
         else:
-            cfg2 = self.meta_cfg['custom_modes'][mode]
+            cfg = self.meta_cfg['custom_modes'][mode]
 
         # 3 _attrs的处理
         def _attrs2attrs(_attrs):
@@ -111,12 +122,13 @@ class LabelCfg:
                 res.append(d)
             return res
 
-        if '_attrs' in cfg2:
-            cfg2['attrs'] = _attrs2attrs(cfg2['_attrs'])
-            del cfg2['_attrs']
+        if '_attrs' in cfg:
+            cfg['attrs'] = _attrs2attrs(cfg['_attrs'])
+            del cfg['_attrs']
 
         # 4 设置该模式的详细配置
-        cfg.update(cfg2)
+        default_cfg.update(cfg)
+        cfg = default_cfg
         self.keyidx = {x['key']: i for i, x in enumerate(cfg['attrs'])}
         for x in cfg['attrs']:
             if isinstance(x['items'], (list, tuple)):
@@ -128,59 +140,81 @@ class LabelCfg:
         self.hide_attrs = [x['key'] for x in cfg['attrs'] if x['show'] == 0]
         self.cfg = cfg
 
-    def get_default_label(self, *, shape=None, mainwin=None):
+    def get_default_label(self, *, shape=None):
         """ 新建shape的时候，使用的默认label值
 
         :param shape: 可以输入一个shape供参考
 
         这里有办法获取原图，也有办法获取标注的shape，从而可以智能推断，给出识别值的
         """
-        from pyxllib.xlcv import xlcv
-        if mainwin:
-            mainwin.cvimg = xlcv.read(mainwin.imagePath)
+        label = self.cfg.get('default_label', '')
 
-        label = json.dumps({'text': '', 'type': '印刷体'}, ensure_ascii=False)
+        if self.auto_rec_text and shape:
+            k = 'label' if 'label' in self.keys else 'text'
+            text, score = self.rec_text(self.mainwin.imagePath, shape)
+            label = self.set_label_attr(label, k, text)
+            label = self.set_label_attr(label, 'score', score)
+
         return label
 
-    def config_menu_label(self):
+    def config_label_menu(self):
         """ Label菜单栏
         """
-        from PyQt5.QtWidgets import QAction
 
-        # 1 关联label操作的回调函数
-        def func(action):
-            # 1 内置数据格式
-            action.setCheckable(True)
-            action.setChecked(True)
-            self.reset(action.text())
-            # 一个时间，只能开启一个模式
-            for a in parent.findChildren(QAction):
-                if a is not action:
-                    a.setChecked(False)
+        def get_task_menu():
+            # 1 关联选择任务后的回调函数
+            def func(action):
+                # 1 内置数据格式
+                action.setCheckable(True)
+                action.setChecked(True)
+                self.reset(action.text())
+                # 一个时间，只能开启一个模式
+                for a in task_menu.findChildren(QAction):
+                    if a is not action:
+                        a.setChecked(False)
 
-            # 2 如果是自定义模式，弹出编辑窗
-            pass
+                # 2 如果是自定义模式，弹出编辑窗
+                pass
 
-            # 3 保存配置
-            self.save_config()
+                # 3 保存配置
+                self.save_config()
 
-        parent = self.parent.menus.label
-        parent.triggered.connect(func)
+            task_menu = QMenu('任务', label_menu)
+            task_menu.triggered.connect(func)
 
-        # 2 往Label菜单添加选项功能
-        actions = []
-        for x in _CONFIGS.keys():
-            actions.append(QAction(x, parent))
-        if self.meta_cfg['custom_modes']:
-            actions.append(None)
-            for x in self.meta_cfg['custom_modes'].keys():
-                actions.append(QAction(x, parent))
-        # 激活初始mode模式的标记
-        for a in actions:
-            if a.text() == self.meta_cfg['current_mode']:
-                a.setCheckable(True)
-                a.setChecked(True)
-        utils.addActions(parent, actions)
+            # 2 往Label菜单添加选项功能
+            actions = []
+            for x in _CONFIGS.keys():
+                actions.append(QAction(x, task_menu))
+            if self.meta_cfg['custom_modes']:
+                actions.append(None)
+                for x in self.meta_cfg['custom_modes'].keys():
+                    actions.append(QAction(x, task_menu))
+            # 激活初始mode模式的标记
+            for a in actions:
+                if a.text() == self.meta_cfg['current_mode']:
+                    a.setCheckable(True)
+                    a.setChecked(True)
+            utils.addActions(task_menu, actions)
+            return task_menu
+
+        def get_auto_rec_text_action():
+            a = QAction('自动识别文本内容', label_menu)
+            a.setCheckable(True)
+            a.setChecked(self.auto_rec_text)
+
+            def func(x):
+                self.auto_rec_text = x
+                if x:
+                    self.ensure_ppocr()
+
+            a.triggered.connect(func)
+            return a
+
+        label_menu = self.mainwin.menus.label
+        label_menu.addMenu(get_task_menu())
+        label_menu.addSeparator()
+        label_menu.addAction(get_auto_rec_text_action())
 
     def parse_shape(self, shape):
         """ xllabelme相关扩展功能，常用的shape解析
@@ -280,3 +314,59 @@ class LabelCfg:
             labelattr['label'] = label
         labelattr[k] = v
         return json.dumps(labelattr, ensure_ascii=False)
+
+    def __smart_label(self):
+        """ 智能标注相关 """
+
+    def ensure_ppocr(self):
+        if not hasattr(self, 'ppocr'):
+            with WaitMessageBox(self.mainwin, 'PaddleOCR模型初始化中，请稍等一会...'):
+                from pyxlpr.paddleocr import PaddleOCR
+                self.ppocr = PaddleOCR.build_ppocr()
+
+    def rec_text(self, image_path, shape):
+        from pyxllib.xlcv import xlcv
+        if image_path not in self.cur_img:
+            self.cur_img = {image_path: xlcv.read(image_path)}
+        img = self.cur_img[image_path]
+        pts = [(p.x(), p.y()) for p in shape.points]
+        im = xlcv.get_sub(img, pts, warp_quad=True)
+        text, score = self.ppocr.rec_singleline(im)
+        return text, score
+
+    def __right_click_shape(self):
+        """ 扩展shape右键操作菜单功能
+        """
+        pass
+
+    def get_current_select_shape(self):
+        """ 如果当前没有选中item（shape），会返回None """
+        mainwin = self.mainwin
+        if not mainwin.canvas.editing():
+            return
+        item = mainwin.currentItem()
+        if item is None:
+            return
+        shape = item.shape()
+        return shape
+
+    def convert_to_rectangle_action(self):
+        """ 将shape形状改为四边形 """
+
+        def func():
+            shape = self.get_current_select_shape()
+            if shape:
+                shape.shape_type = 'rectangle'
+                pts = [(p.x(), p.y()) for p in shape.points]
+                l, t, r, b = rect_bounds(pts)
+                shape.points = [QPointF(l, t), QPointF(r, b)]
+
+        mainwin = self.mainwin
+        a = utils.newAction(mainwin,
+                            mainwin.tr("Convert to Rectangle"),
+                            func,
+                            None,  # shortcut
+                            None,  # icon
+                            mainwin.tr("将当前shape转为Rectangle矩形")  # 左下角的提示
+                            )
+        return a

@@ -183,7 +183,9 @@ class Canvas(QtWidgets.QWidget):
         return self.hVertex is not None
 
     def selectedEdge(self):
-        return self.hEdge is not None
+        # ckz 多边形精细标注暂时用不到，先关了
+        return False
+        # return self.hEdge is not None
 
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""

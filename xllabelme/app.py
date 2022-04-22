@@ -37,7 +37,7 @@ from xllabelme.widgets import LabelListWidgetItem
 from xllabelme.widgets import ToolBar
 from xllabelme.widgets import UniqueLabelQListWidget
 from xllabelme.widgets import ZoomWidget
-from xllabelme.config.labelcfglib import LabelCfg
+from xllabelme.config.xllabellib import XlLabel
 
 from pyxllib.gui.qt import XlActionFunc, GetItemsAction
 
@@ -1345,10 +1345,9 @@ class MainWindow(QtWidgets.QMainWindow):
         group_id = None
         if self._config["display_label_popup"] or not text:
             previous_text = self.labelDialog.edit.text()
-            if self.labelcfg.cfg['autodict']:  # ckz
+            if self.xllabel.cfg['autodict']:  # ckz
                 shape = Shape()
-                shape.label = self.labelcfg.get_default_label(shape=self.canvas.shapes[-1],
-                                                              mainwin=self)
+                shape.label = self.xllabel.get_default_label(shape=self.canvas.shapes[-1])
                 shape = self.labelDialog.popUp2(shape, self)
                 if shape is not None:
                     text, flags, group_id = shape.label, shape.flags, shape.group_id
@@ -2596,6 +2595,9 @@ class XlMainWindow(MainWindow):
             self.popLabelListMenu
         )
 
+        # ckz扩展的一些高级功能
+        self.xllabel = XlLabel(self)
+
         # Store actions for further handling.
         self.actions = utils.struct(
             saveAuto=saveAuto,
@@ -2665,6 +2667,8 @@ class XlMainWindow(MainWindow):
                 undo,
                 undoLastPoint,
                 removePoint,
+                None,
+                self.xllabel.convert_to_rectangle_action(),
             ),
             onLoadActive=(
                 close,
@@ -2740,8 +2744,7 @@ class XlMainWindow(MainWindow):
 
         self.menus.file.aboutToShow.connect(self.updateFileMenu)
 
-        # ckz扩展的一些高级功能
-        self.labelcfg = LabelCfg(self)
+        self.xllabel.config_label_menu()
 
         # Custom context menu for the canvas widget:
         utils.addActions(self.canvas.menus[0], self.actions.menu)
@@ -2916,8 +2919,8 @@ class XlMainWindow(MainWindow):
         :param label_list_item: item是shape的父级，挂在labelList下的项目
         """
         # 1 确定显示的文本 text
-        self.labelcfg.update_other_data(shape)
-        showtext, hashtext, labelattr = self.labelcfg.parse_shape(shape)
+        self.xllabel.update_other_data(shape)
+        showtext, hashtext, labelattr = self.xllabel.parse_shape(shape)
         if label_list_item:
             label_list_item.setText(showtext)
         else:
@@ -2976,10 +2979,10 @@ class XlMainWindow(MainWindow):
 
         # 注意，只有用shape_color才能全局调整颜色，下面六个属性是单独调的
         # 线的颜色
-        rgb_ = parse_htext(self.labelcfg.get_hashtext(labelattr, 'label_line_color'))
+        rgb_ = parse_htext(self.xllabel.get_hashtext(labelattr, 'label_line_color'))
         shape.line_color = QtGui.QColor(*seleter('line_color', rgb_))
         # 顶点颜色
-        rgb_ = parse_htext(self.labelcfg.get_hashtext(labelattr, 'label_vertex_fill_color'))
+        rgb_ = parse_htext(self.xllabel.get_hashtext(labelattr, 'label_vertex_fill_color'))
         shape.vertex_fill_color = QtGui.QColor(*seleter('vertex_fill_color', rgb_))
         # 悬停时顶点颜色
         shape.hvertex_fill_color = QtGui.QColor(*seleter('hvertex_fill_color', (255, 255, 255)))
