@@ -37,7 +37,7 @@ from xllabelme.widgets import LabelListWidgetItem
 from xllabelme.widgets import ToolBar
 from xllabelme.widgets import UniqueLabelQListWidget
 from xllabelme.widgets import ZoomWidget
-from xllabelme.config import itemcfg
+from xllabelme.config.labelcfglib import LabelCfg
 
 from pyxllib.gui.qt import XlActionFunc, GetItemsAction
 
@@ -1332,14 +1332,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Callback functions:
 
-    def newShape(self, dictmode=True):
+    def newShape(self):
         """Pop-up and give focus to the label editor.
 
         position MUST be in global coordinates.
-
-        :param dictmode: ckz，新增模式，默认情况新增的shape是普通的文本label
-            启用dictmode，则默认会变成新建字典的格式
-            注意此时要配置字典的默认属性
         """
         items = self.uniqLabelList.selectedItems()
         text = None
@@ -1349,9 +1345,10 @@ class MainWindow(QtWidgets.QMainWindow):
         group_id = None
         if self._config["display_label_popup"] or not text:
             previous_text = self.labelDialog.edit.text()
-            if dictmode:  # ckz
+            if self.labelcfg.cfg['autodict']:  # ckz
                 shape = Shape()
-                shape.label = json.dumps({'text': '', 'type': '印刷体'}, ensure_ascii=False)
+                shape.label = self.labelcfg.get_default_label(shape=self.canvas.shapes[-1],
+                                                              mainwin=self)
                 shape = self.labelDialog.popUp2(shape, self)
                 if shape is not None:
                     text, flags, group_id = shape.label, shape.flags, shape.group_id
@@ -2743,7 +2740,8 @@ class XlMainWindow(MainWindow):
 
         self.menus.file.aboutToShow.connect(self.updateFileMenu)
 
-        self.config_menu_label()
+        # ckz扩展的一些高级功能
+        self.labelcfg = LabelCfg(self)
 
         # Custom context menu for the canvas widget:
         utils.addActions(self.canvas.menus[0], self.actions.menu)
@@ -2844,94 +2842,6 @@ class XlMainWindow(MainWindow):
         # if self.firstStart:
         #    QWhatsThis.enterWhatsThisMode()
 
-    def config_menu_label(self):
-        class LabelCfg(XlActionFunc):
-            def __init__(self, *args, read_exists_cfg=True, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.origin_value = self.value  # 备份一个原始配置
-                self.update_keyidx()
-
-                # 如果有配置文件，则读取配置
-                self.configpath = osp.join(osp.expanduser("~"), ".xllabelme_labelcfg")
-                if osp.isfile(self.configpath) and read_exists_cfg:
-                    with open(self.configpath, 'r', encoding='utf8') as f:
-                        self.value = json.load(f)
-                    self.update_keyidx()
-                    self.update_items()
-
-            def update_keyidx(self):
-                self.keyidx = {x['key']: i for i, x in enumerate(self.value)}
-
-            def update_items(self):
-                for x in self.value:
-                    if isinstance(x['items'], (list, tuple)):
-                        if x.get('editable', 0):
-                            x['items'] = list(x['items'])
-                        else:
-                            x['items'] = tuple(x['items'])
-
-            def keys(self):
-                return [x['key'] for x in self.value]
-
-            def hide_attrs(self):
-                return [x['key'] for x in self.value if x['show'] == 0]
-
-            def get(self, k, default=None):
-                idx = self.keyidx.get(k, None)
-                if idx is not None:
-                    return self.value[idx]
-                else:
-                    return default
-
-            def __call__(self, checked):
-                """ 修改配置表的功能
-
-                这个能做成表格最好，但是表格有太多相关功能不好开发
-                只能先用最纯粹的文本编辑
-                """
-                super().__call__(checked)
-                inputs = QInputDialog.getMultiLineText(self.parent, self.title, '编辑json数据：',
-                                                       json.dumps(self.value, indent=2, ensure_ascii=False))
-                if inputs[1]:  # “确定操作” 才更新属性
-                    self.value = json.loads(inputs[0])
-                    self.update_keyidx()
-                    self.update_items()
-
-                    # 保存到文件
-                    with open(self.configpath, 'w', encoding='utf8') as f:
-                        json.dump(self.value, f, indent=2, ensure_ascii=False)
-
-                self.parent.updateLabelListItems()
-
-        class ColorCfg(GetItemsAction):
-            def __call__(self, checked):
-                super().__call__(checked)
-                self.parent.updateLabelListItems()
-
-        # self.labelcfg = LabelCfg(self, 'attr属性配置', xllabelme.config.itemcfg.COCO)
-        self.labelcfg = LabelCfg(self, 'attr属性配置', xllabelme.config.itemcfg.RELABEL2, read_exists_cfg=False)
-        self.label_editable = XlActionFunc(self, '字典格式label可编辑', checked=False)
-        # self.label_shape_color = ColorCfg(self, 'hashlabel/shape_color',
-        #                                   'category_id,content_class'.split(','))
-        self.label_shape_color = ColorCfg(self, 'hashlabel/shape_color', ['type'])
-        self.label_line_color = ColorCfg(self, 'line_color',
-                                         'gt_category_id,gt_category_name'.split(','))
-        self.label_vertex_fill_color = ColorCfg(self, 'vertex_fill_color',
-                                                'dt_category_id,dt_category_name'.split(','))
-
-        # 3 增加菜单选项
-        utils.addActions(
-            self.menus.label,
-            (
-                self.labelcfg.action,
-                self.label_editable.action,
-                None,
-                self.label_shape_color.action,
-                self.label_line_color.action,
-                self.label_vertex_fill_color.action,
-            ),
-        )
-
     def extendShapeMessage(self, shape):
         """ shape中自定义字段等信息
 
@@ -3006,8 +2916,8 @@ class XlMainWindow(MainWindow):
         :param label_list_item: item是shape的父级，挂在labelList下的项目
         """
         # 1 确定显示的文本 text
-        shape.update_other_data()
-        showtext, hashtext, labelattr = shape.parser(self)
+        self.labelcfg.update_other_data(shape)
+        showtext, hashtext, labelattr = self.labelcfg.parse_shape(shape)
         if label_list_item:
             label_list_item.setText(showtext)
         else:
@@ -3066,10 +2976,10 @@ class XlMainWindow(MainWindow):
 
         # 注意，只有用shape_color才能全局调整颜色，下面六个属性是单独调的
         # 线的颜色
-        rgb_ = parse_htext(shape.hashtext(labelattr, self.label_line_color))
+        rgb_ = parse_htext(self.labelcfg.get_hashtext(labelattr, 'label_line_color'))
         shape.line_color = QtGui.QColor(*seleter('line_color', rgb_))
         # 顶点颜色
-        rgb_ = parse_htext(shape.hashtext(labelattr, self.label_vertex_fill_color))
+        rgb_ = parse_htext(self.labelcfg.get_hashtext(labelattr, 'label_vertex_fill_color'))
         shape.vertex_fill_color = QtGui.QColor(*seleter('vertex_fill_color', rgb_))
         # 悬停时顶点颜色
         shape.hvertex_fill_color = QtGui.QColor(*seleter('hvertex_fill_color', (255, 255, 255)))

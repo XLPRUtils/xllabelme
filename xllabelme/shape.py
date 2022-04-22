@@ -7,8 +7,6 @@ from qtpy import QtGui
 
 from xllabelme import __appname
 import xllabelme.utils
-from pyxllib.algo.pupil import make_index_function
-from pyxllib.prog.pupil import DictTool
 
 # TODO(unknown):
 # - [opt] Store paths instead of creating new ones at each paint.
@@ -22,7 +20,7 @@ DEFAULT_VERTEX_FILL_COLOR = QtGui.QColor(0, 255, 0, 255)  # hovering
 DEFAULT_HVERTEX_FILL_COLOR = QtGui.QColor(255, 255, 255, 255)  # hovering
 
 
-class DefaultShape(object):
+class Shape(object):
     # Render handles as squares
     P_SQUARE = 0
 
@@ -293,93 +291,3 @@ class DefaultShape(object):
 
     def __setitem__(self, key, value):
         self.points[key] = value
-
-
-class ShapeExt(DefaultShape):
-    def parser(self, mainwin):
-        """ xllabelme相关扩展功能，常用的shape解析
-        :return:
-            showtext，需要重定制展示内容
-            hashtext，用于哈希颜色计算的label
-            labeldata，解析成字典的数据，如果其本身标注并不是字典，则该参数为空值
-        """
-        # 1 默认值，后面根据参数情况会自动调整
-        showtext = self.label
-        labelattr = self.getLabelAttr(self.label)
-
-        # 2 hashtext
-        # self.hashtext成员函数只简单分析labelattr，作为shape_color需要扩展考虑更多特殊情况
-        hashtext = self.hashtext(labelattr, mainwin.label_shape_color)
-        if not hashtext:
-            if 'label' in labelattr:
-                hashtext = labelattr['label']
-            elif 'id' in labelattr:
-                hashtext = labelattr['id']
-            elif labelattr:
-                hashtext = next(iter(labelattr.values()))
-            else:
-                hashtext = showtext
-        hashtext = str(hashtext)
-
-        # 3 showtext
-        cfg = mainwin.labelcfg
-        if labelattr:
-            # 3.1 隐藏部分属性
-            hide_attrs = cfg.hide_attrs()
-            showdict = {k: v for k, v in labelattr.items() if k not in hide_attrs}
-            # 3.2 排序
-            keys = sorted(showdict.keys(), key=make_index_function(cfg.keys()))
-            showdict = {k: showdict[k] for k in keys}
-            showtext = json.dumps(showdict, ensure_ascii=False)
-        # 3.3 转成文本，并判断是否有 group_id 待展示
-        if self.group_id not in (None, ''):  # 这里扩展支持空字符串
-            showtext = "{} ({})".format(showtext, self.group_id)
-
-        # + return
-        return showtext, hashtext, labelattr
-
-    def update_other_data(self):
-        labelattr = self.getLabelAttr(self.label, self.other_data)
-        if labelattr:
-            self.label = json.dumps(labelattr, ensure_ascii=False)
-            self.other_data = {}
-
-    @classmethod
-    def getLabelAttr(cls, label, other_data=None):
-        labelattr = DictTool.json_loads(label)
-
-        if other_data:
-            if not labelattr:  # 如果有other_data，非字典结构的label也会强制升为字典
-                labelattr['label'] = label
-            # 如果有扩展字段，则也将数据强制取入 labelattr
-            labelattr.update(other_data)
-        return labelattr
-
-    @classmethod
-    def setLabelAttr(cls, label, k, v):
-        """ 修改labelattr字典值 """
-        labelattr = cls.getLabelAttr(label)
-        if not labelattr:  # 如果有other_data，非字典结构的label也会强制升为字典
-            labelattr['label'] = label
-        labelattr[k] = v
-        return json.dumps(labelattr, ensure_ascii=False)
-
-    @classmethod
-    def hashtext(cls, labelattr, action):
-        """
-        :param labelattr:
-        :param action:
-        :return:
-            如果 labelattr 有对应key，action也有开，则返回拼凑的哈希字符串值
-            否则返回 None
-        """
-        ls = []
-        attrs = action.value
-        for k in attrs:
-            if k in labelattr:
-                ls.append(str(labelattr[k]))
-        if ls:
-            return ', '.join(ls)
-
-
-Shape = ShapeExt

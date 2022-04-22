@@ -23,7 +23,7 @@ def get_version():
     # if not match:
     #     raise RuntimeError("{} doesn't contain __version__".format(filename))
     # version = match.groups()[0]
-    version = '1.8'
+    version = '2.0'
     return version
 
 

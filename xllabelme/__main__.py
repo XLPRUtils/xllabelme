@@ -30,6 +30,7 @@ def default_argument_parser():
         choices=["debug", "info", "warning", "fatal", "error"],
         help="logger level",
     )
+    # 位置参数，可以直接输入 文件/目录，自动 open/open dir
     parser.add_argument("filename", nargs="?", help="image or label filename")
     parser.add_argument(
         "--output",
