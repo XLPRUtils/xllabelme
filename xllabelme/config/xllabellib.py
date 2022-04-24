@@ -413,6 +413,8 @@ class XlLabel:
         """ 将一个框拆成两个框
 
         TODO 支持对任意四边形的拆分
+        策略1：现有交互机制上，选择参考点后，拆分出多边形
+        策略2：出来一把剪刀，通过画线指定切分的详细形式
         """
 
         def func():
@@ -438,15 +440,17 @@ class XlLabel:
                 else:  # 否则按几何比例重分配文本
                     from pyxlpr.data.imtextline import merge_labels_by_widths
                     text = self.get_labelattr(shape.label).get('text', '')
-                    text1, text2 = merge_labels_by_widths(list(text), [p - l, r - p])
-                    self.update_shape_text(shape.label, text1)
-                    self.update_shape_text(shape2.label, text2)
+                    text1, text2 = merge_labels_by_widths(list(text), [p - l, r - p], '')
+                    self.update_shape_text(shape, text1)
+                    self.update_shape_text(shape2, text2)
 
                 # 3 更新到shapes里
-                mainwin.canvas.shapes.append(shape2)
+                mainwin.canvas.selectedShapes.append(shape2)
                 mainwin.addLabel(shape2)
-                # 更新控件
-                mainwin.updateLabelListItems()
+                shapes = mainwin.canvas.shapes
+                idx = shapes.index(shape)
+                shapes = shapes[:idx + 1] + [shape2] + shapes[idx + 1:]  # 在相邻位置插入新的shape
+                mainwin.updateShapes(shapes)
                 mainwin.setDirty()
 
         mainwin = self.mainwin

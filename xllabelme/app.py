@@ -2913,9 +2913,25 @@ class XlMainWindow(MainWindow):
             self.uniqLabelList.addItem(item)
 
     def addLabel(self, shape):
+        """ 重载了官方的写法，这里这种写法才能兼容xllabelme的shape颜色渲染规则
+        """
         label_list_item = self.updateShape(shape)
         self.labelList.addItem(label_list_item)
         shape.other_data = {}
+
+    def updateShapes(self, shapes):
+        """ 自己扩展的
+
+        输入新的带顺序的shapes集合，更新canvas和labelList相关配置
+        """
+        self.canvas.shapes = shapes
+        self.canvas.storeShapes()  # 备份形状
+
+        # 不知道怎么insertItem，干脆全部清掉，重新画
+        self.labelList.clear()
+        for sp in self.canvas.shapes:
+            label_list_item = self.updateShape(sp)
+            self.labelList.addItem(label_list_item)
 
     def updateLabelListItems(self):
         for i in range(len(self.labelList)):
@@ -3031,6 +3047,7 @@ class XlMainWindow(MainWindow):
     def saveLabels(self, filename):
         lf = LabelFile()
 
+        # 1 取出核心数据进行保存
         def format_shape(s):
             data = s.other_data.copy()
             data.update(
@@ -3044,8 +3061,10 @@ class XlMainWindow(MainWindow):
             )
             return data
 
+        # shapes标注数据，用的是labelList里存储的item.shape()
         shapes = [format_shape(item.shape()) for item in self.labelList]
-        flags = {}
+        flags = {}  # 每张图分类时，每个类别的标记，True或False
+        # 整张图的分类标记
         for i in range(self.flag_widget.count()):
             item = self.flag_widget.item(i)
             key = item.text()
@@ -3068,6 +3087,8 @@ class XlMainWindow(MainWindow):
                 otherData=self.otherData,
                 flags=flags,
             )
+
+            # 2 fileList里可能原本没有标记json文件的，现在可以标记
             self.labelFile = lf
             items = self.fileListWidget.findItems(
                 self.imagePath, Qt.MatchExactly

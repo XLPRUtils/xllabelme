@@ -23,7 +23,7 @@ def get_version():
     # if not match:
     #     raise RuntimeError("{} doesn't contain __version__".format(filename))
     # version = match.groups()[0]
-    version = '2.1.4'
+    version = '2.1.5'
     return version
 
 
@@ -34,7 +34,7 @@ def get_install_requires():
 
     # 试了py3.6、py3.8，都是能编译exe成功的
     install_requires = [
-        "pyxllib>=0.2.5",
+        "pyxllib>=0.2.7",
         # "imgviz==1.2.1",  # 这个限定不用，新版imgviz又兼容了
         "imgviz>=0.11",
         "matplotlib<3.3",  # for PyInstaller
