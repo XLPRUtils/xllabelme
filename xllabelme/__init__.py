@@ -18,7 +18,7 @@ from qtpy import QT_VERSION
 __version__ = "5.0.1"
 
 # 2 扩展的更灵活的labelme，兼容官方的功能，但有更强的可视化效果，能查看shape的多个属性值
-__appname__ = "xllabelme v2.1"
+__appname__ = "xllabelme v2.1.3"
 
 # 开头的xllabelme不要改，这里就能自动匹配到
 __appname = re.match(r'\w+', __appname__).group()

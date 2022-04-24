@@ -39,6 +39,7 @@ def default_argument_parser():
         help="output file or directory (if it ends with .json it is "
              "recognized as file, else as directory)",
     )
+    # 从配置文件读取一套默认配置参数
     default_config_file = os.path.join(os.path.expanduser("~"), ".labelmerc")
     parser.add_argument(
         "--config",
@@ -54,6 +55,8 @@ def default_argument_parser():
         dest="store_data",
         action="store_false",
         help="stop storing image data to JSON file",
+        # argparse.SUPPRESS作用：未设置--nodata时不存在nodata变量，区别于nodata默认值是False
+        # 目的在于后面要在文件默认配置基础上，覆盖命令行的配置，如果命令行未设置，不能强行覆盖一个False
         default=argparse.SUPPRESS,
     )
     parser.add_argument(
@@ -110,7 +113,7 @@ def default_argument_parser():
     return parser
 
 
-def main(mainwin):
+def main(mainwin=XlMainWindow):
     """ 进行重封装，可以重新指定appname、version版本，以及主窗口程序mainwin """
     args = default_argument_parser().parse_args()
 

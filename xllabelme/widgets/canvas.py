@@ -183,9 +183,7 @@ class Canvas(QtWidgets.QWidget):
         return self.hVertex is not None
 
     def selectedEdge(self):
-        # ckz 多边形精细标注暂时用不到，先关了
-        return False
-        # return self.hEdge is not None
+        return self.hEdge is not None
 
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""
@@ -323,6 +321,10 @@ class Canvas(QtWidgets.QWidget):
         self.vertexSelected.emit(self.hVertex is not None)
 
     def addPointToEdge(self):
+        mainwin = self.parent().parent().parent()
+        if not mainwin.actions.add_point_to_edge.isChecked():
+            return
+
         shape = self.prevhShape
         index = self.prevhEdge
         point = self.prevMovePoint

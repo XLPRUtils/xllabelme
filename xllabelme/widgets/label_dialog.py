@@ -242,6 +242,8 @@ class DefaultLabelDialog(QtWidgets.QDialog):
 
 
 class LabelDialogExt(DefaultLabelDialog):
+    """ 双击Label，打开的查看、编辑label框
+    """
     def __init__(
             self,
             text="Enter object label",

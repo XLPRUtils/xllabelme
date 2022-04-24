@@ -14,8 +14,6 @@ from pyxllib.gui.qt import WaitMessageBox
 from xllabelme import utils
 
 _CONFIGS = {
-    'labelme': {'autodict': False},
-    'xllabelme': {},
     '文字通用':
         {'_attrs':
              [['text', 1, 'str'],
@@ -38,7 +36,7 @@ _CONFIGS = {
     'XlCoco': {
         '_attrs':
             [['id', 1, 'int'],
-             ['label', 1, 'str'],
+             ['text', 1, 'str'],  # 这个本来叫label，但为了规范，统一成text
              ['category_id', 1, 'int'],
              ['content_type', 1, 'str', ('印刷体', '手写体', '印章', '身份证', '表格', '其它证件类', '其它')],
              ['content_class', 1, 'str'],
@@ -59,7 +57,7 @@ _CONFIGS = {
     },
     'Sroie2019+':
         {'_attrs':
-             [['label', 1, 'str'],
+             [['text', 1, 'str'],  # 原来叫label的，改成text
               ['sroie_class', 1, 'str', ('other', 'company', 'address', 'date', 'total')],
               ['sroie_kv', 1, 'str', ('other', 'key', 'value')],
               ]
@@ -68,13 +66,17 @@ _CONFIGS = {
 
 
 class XlLabel:
+    """
+    开发指南：尽量把对xllabelme的扩展，都写到这个类里，好集中统一管理
+    """
+
     def __init__(self, parent):
         self.mainwin = parent
-        self.configpath = XlPath.userdir() / ".xllabelme_labelcfg"
+        self.configpath = XlPath.userdir() / ".xllabelme"
         if self.configpath.is_file():
             self.meta_cfg = self.configpath.read_json()
         else:
-            self.meta_cfg = {'current_mode': 'xllabelme',
+            self.meta_cfg = {'current_mode': '文字通用',
                              'custom_modes': {}
                              }
 
@@ -86,6 +88,8 @@ class XlLabel:
         self.reset()
         # self.config_label_menu()  # 配置界面
 
+        self.ppocr = None
+
     def reset(self, mode=None):
         # 1 确定mode
         if mode:
@@ -95,7 +99,6 @@ class XlLabel:
         # 2 预设mode或自定义mode的详细配置
         default_cfg = {
             'attrs': [],
-            'autodict': True,
             'editable': False,
             'label_shape_color': [],
             'label_line_color': [],
@@ -148,13 +151,11 @@ class XlLabel:
         这里有办法获取原图，也有办法获取标注的shape，从而可以智能推断，给出识别值的
         """
         label = self.cfg.get('default_label', '')
-
         if self.auto_rec_text and shape:
             k = 'label' if 'label' in self.keys else 'text'
-            text, score = self.rec_text(self.mainwin.imagePath, shape)
+            text, score = self.rec_text(self.mainwin.imagePath, shape.points)
             label = self.set_label_attr(label, k, text)
             label = self.set_label_attr(label, 'score', score)
-
         return label
 
     def config_label_menu(self):
@@ -226,7 +227,7 @@ class XlLabel:
         """
         # 1 默认值，后面根据参数情况会自动调整
         showtext = shape.label
-        labelattr = self.get_label_attr(shape.label)
+        labelattr = self.get_labelattr(shape.label)
 
         # 2 hashtext
         # self.hashtext成员函数只简单分析labelattr，作为shape_color需要扩展考虑更多特殊情况
@@ -268,6 +269,20 @@ class XlLabel:
     def save_config(self):
         self.configpath.write_json(self.meta_cfg, encoding='utf8', indent=2, ensure_ascii=False)
 
+    def __labelattr(self):
+        """ label相关的操作
+
+        labelme原始的格式，每个shape里的label字段存储的是一个str类型
+        我为了扩展灵活性，在保留起str类型的前提下，存储的是一串可以解析为json字典的数据
+        前者称为labelstr类型，后者称为labelattr格式
+
+        下面封装了一些对label、labelattr进行操作的功能
+        """
+
+    @classmethod
+    def json_dumps(cls, label):
+        return json.dumps(label, ensure_ascii=False)
+
     def get_hashtext(self, labelattr, mode='label_shape_color'):
         """
         :param labelattr:
@@ -289,31 +304,49 @@ class XlLabel:
 
     @classmethod
     def update_other_data(cls, shape):
-        labelattr = cls.get_label_attr(shape.label, shape.other_data)
+        labelattr = cls.get_labelattr(shape.label, shape.other_data)
         if labelattr:
-            shape.label = json.dumps(labelattr, ensure_ascii=False)
+            shape.label = cls.json_dumps(labelattr)
             shape.other_data = {}
 
     @classmethod
-    def get_label_attr(cls, label, other_data=None):
-        labelattr = DictTool.json_loads(label)
-
+    def get_labelattr(cls, label, other_data=None):
+        """ 如果不是字典，也自动升级为字典格式 """
+        labelattr = DictTool.json_loads(label, 'text')
         if other_data:
-            # 如果有other_data，非字典结构的label也会强制升为字典
-            if not labelattr:
-                labelattr['label'] = label
             # 如果有扩展字段，则也将数据强制取入 labelattr
             labelattr.update(other_data)
         return labelattr
 
     @classmethod
     def set_label_attr(cls, label, k, v):
-        """ 修改labelattr字典值 """
-        labelattr = cls.get_label_attr(label)
-        if not labelattr:  # 如果有other_data，非字典结构的label也会强制升为字典
-            labelattr['label'] = label
+        """ 修改labelattr某项字典值 """
+        labelattr = cls.get_labelattr(label)
         labelattr[k] = v
-        return json.dumps(labelattr, ensure_ascii=False)
+        return cls.json_dumps(labelattr)
+
+    def update_shape_text(self, x, text=None):
+        """ 更新text内容
+
+        :param x: 可以是shape结构，也可以是label字符串
+            如果是shape结构，text又设为None，则会尝试用ocr模型识别文本
+        """
+        if isinstance(x, dict):
+            if text is not None:
+                x['text'] = text
+        elif isinstance(x, str):
+            if text is not None:
+                x = self.set_label_attr(x, 'text', text)
+        else:  # Shape结构
+            if text is None:
+                if self.ppocr:
+                    labelattr = self.get_labelattr(x.label)
+                    labelattr['text'], labelattr['score'] = self.rec_text(x.points)
+                    x.label = self.json_dumps(labelattr)
+            else:
+                x.label = self.set_label_attr(x.label, 'text', text)
+
+        return x
 
     def __smart_label(self):
         """ 智能标注相关 """
@@ -324,42 +357,47 @@ class XlLabel:
                 from pyxlpr.paddleocr import PaddleOCR
                 self.ppocr = PaddleOCR.build_ppocr()
 
-    def rec_text(self, image_path, shape):
+    def rec_text(self, points):
         from pyxllib.xlcv import xlcv
+        # 1 确认下图片数据是否有缓存
+        image_path = self.mainwin.imagePath
         if image_path not in self.cur_img:
             self.cur_img = {image_path: xlcv.read(image_path)}
+        # 2 识别指定的points区域
         img = self.cur_img[image_path]
-        pts = [(p.x(), p.y()) for p in shape.points]
-        im = xlcv.get_sub(img, pts, warp_quad=True)
+        if isinstance(points, QPointF):
+            points = [(p.x(), p.y()) for p in points]
+        im = xlcv.get_sub(img, points, warp_quad=True)
         text, score = self.ppocr.rec_singleline(im)
         return text, score
 
     def __right_click_shape(self):
         """ 扩展shape右键操作菜单功能
         """
-        pass
 
     def get_current_select_shape(self):
         """ 如果当前没有选中item（shape），会返回None """
         mainwin = self.mainwin
         if not mainwin.canvas.editing():
-            return
+            return None, None
         item = mainwin.currentItem()
         if item is None:
-            return
+            return None, None
         shape = item.shape()
-        return shape
+        return item, shape
 
     def convert_to_rectangle_action(self):
         """ 将shape形状改为四边形 """
 
         def func():
-            shape = self.get_current_select_shape()
+            item, shape = self.get_current_select_shape()
             if shape:
                 shape.shape_type = 'rectangle'
                 pts = [(p.x(), p.y()) for p in shape.points]
                 l, t, r, b = rect_bounds(pts)
                 shape.points = [QPointF(l, t), QPointF(r, b)]
+                mainwin.updateShape(shape, item)
+                mainwin.setDirty()
 
         mainwin = self.mainwin
         a = utils.newAction(mainwin,
@@ -368,5 +406,55 @@ class XlLabel:
                             None,  # shortcut
                             None,  # icon
                             mainwin.tr("将当前shape转为Rectangle矩形")  # 左下角的提示
+                            )
+        return a
+
+    def split_shape_action(self):
+        """ 将一个框拆成两个框
+
+        TODO 支持对任意四边形的拆分
+        """
+
+        def func():
+            item, shape = self.get_current_select_shape()
+            if shape:
+                # 1 获取两个shape
+                # 第1个形状
+                pts = [(p.x(), p.y()) for p in shape.points]
+                l, t, r, b = rect_bounds(pts)
+                p = mainwin.canvas.prevPoint.x()  # 光标点击的位置
+                shape.shape_type = 'rectangle'
+                shape.points = [QPointF(l, t), QPointF(p, b)]
+
+                # 第2个形状
+                shape2 = shape.copy()
+                shape2.points = [QPointF(p, t), QPointF(r, b)]
+
+                # 2 调整label
+                # 如果开了识别模型，更新识别结果
+                if self.auto_rec_text:
+                    self.update_shape_text(shape)
+                    self.update_shape_text(shape2)
+                else:  # 否则按几何比例重分配文本
+                    from pyxlpr.data.imtextline import merge_labels_by_widths
+                    text = self.get_labelattr(shape.label).get('text', '')
+                    text1, text2 = merge_labels_by_widths(list(text), [p - l, r - p])
+                    self.update_shape_text(shape.label, text1)
+                    self.update_shape_text(shape2.label, text2)
+
+                # 3 更新到shapes里
+                mainwin.canvas.shapes.append(shape2)
+                mainwin.addLabel(shape2)
+                # 更新控件
+                mainwin.updateLabelListItems()
+                mainwin.setDirty()
+
+        mainwin = self.mainwin
+        a = utils.newAction(mainwin,
+                            mainwin.tr("Split Shape"),
+                            func,
+                            None,  # shortcut
+                            None,  # icon
+                            mainwin.tr("在当前鼠标点击位置，将一个shape拆成两个shape（注意，该功能会强制拆出两个矩形框）")
                             )
         return a
