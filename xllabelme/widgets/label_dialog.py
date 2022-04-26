@@ -463,6 +463,7 @@ class LabelDialogExt(DefaultLabelDialog):
             k, s = x['key'], x['show']
             if k in labelattr:
                 keys_group[s].append(k)
+        # labelattr里额外衍生的字段存在第2组
         for k in labelattr.keys():
             if k not in xllabel.keys:
                 keys_group[2].append(k)

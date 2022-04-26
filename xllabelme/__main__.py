@@ -9,8 +9,8 @@ import yaml
 from qtpy import QtCore
 from qtpy import QtWidgets
 
-from xllabelme import __appname__, __appname, __version__
-from xllabelme.app import *
+from xllabelme import __appname__, __version__
+from xllabelme.xlapp import XlMainWindow
 from xllabelme.config import get_config
 from xllabelme.logger import logger
 from xllabelme.utils import newIcon
@@ -55,15 +55,15 @@ def default_argument_parser():
         dest="store_data",
         action="store_false",
         help="stop storing image data to JSON file",
-        # argparse.SUPPRESS作用：未设置--nodata时不存在nodata变量，区别于nodata默认值是False
-        # 目的在于后面要在文件默认配置基础上，覆盖命令行的配置，如果命令行未设置，不能强行覆盖一个False
-        default=argparse.SUPPRESS,
+        default=True,
     )
     parser.add_argument(
         "--autosave",
         dest="auto_save",
         action="store_true",
         help="auto save",
+        # argparse.SUPPRESS作用：未设置--nodata时不存在nodata变量，区别于nodata默认值是False
+        # 目的在于后面要在文件默认配置基础上，覆盖命令行的配置，如果命令行未设置，不能强行覆盖一个False
         default=argparse.SUPPRESS,
     )
     parser.add_argument(
@@ -196,5 +196,4 @@ def main(mainwin=XlMainWindow):
 
 # this main block is required to generate executable by pyinstaller
 if __name__ == "__main__":
-    main({'labelme': MainWindow,
-          'xllabelme': XlMainWindow}[__appname])
+    main(XlMainWindow)

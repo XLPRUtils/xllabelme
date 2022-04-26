@@ -157,7 +157,9 @@ class LabelListWidget(QtWidgets.QListView):
         self.itemDoubleClicked.emit(self.model().itemFromIndex(index))
 
     def selectedItems(self):
-        return [self.model().itemFromIndex(i) for i in self.selectedIndexes()]
+        # TODO 这里可以加一些选中items后的功能
+        items = [self.model().itemFromIndex(i) for i in self.selectedIndexes()]
+        return items
 
     def scrollToItem(self, item):
         self.scrollTo(self.model().indexFromItem(item))

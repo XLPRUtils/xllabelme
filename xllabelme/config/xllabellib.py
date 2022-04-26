@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QMenu, QAction
 from pyxllib.file.specialist import XlPath
 from pyxllib.algo.geo import rect_bounds
 from pyxllib.algo.pupil import make_index_function
+from pyxllib.prog.newbie import round_int
 from pyxllib.prog.pupil import DictTool
 from pyxllib.gui.qt import WaitMessageBox
 
@@ -359,15 +360,10 @@ class XlLabel:
 
     def rec_text(self, points):
         from pyxllib.xlcv import xlcv
-        # 1 确认下图片数据是否有缓存
-        image_path = self.mainwin.imagePath
-        if image_path not in self.cur_img:
-            self.cur_img = {image_path: xlcv.read(image_path)}
-        # 2 识别指定的points区域
-        img = self.cur_img[image_path]
+        # 识别指定的points区域
         if isinstance(points, QPointF):
             points = [(p.x(), p.y()) for p in points]
-        im = xlcv.get_sub(img, points, warp_quad=True)
+        im = xlcv.get_sub(self.mainwin.arr_image, points, warp_quad=True)
         text, score = self.ppocr.rec_singleline(im)
         return text, score
 

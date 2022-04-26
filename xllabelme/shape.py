@@ -5,7 +5,6 @@ import math
 from qtpy import QtCore
 from qtpy import QtGui
 
-from xllabelme import __appname
 import xllabelme.utils
 
 # TODO(unknown):

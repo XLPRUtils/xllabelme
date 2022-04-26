@@ -31,7 +31,7 @@ class LabelFileError(Exception):
     pass
 
 
-class DefaultLabelFile(object):
+class LabelFile(object):
     suffix = ".json"
 
     def __init__(self, filename=None):
@@ -204,6 +204,3 @@ class DefaultLabelFile(object):
     @staticmethod
     def is_label_file(filename):
         return osp.splitext(filename)[1].lower() == LabelFile.suffix
-
-
-LabelFile = DefaultLabelFile

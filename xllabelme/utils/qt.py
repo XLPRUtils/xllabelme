@@ -198,3 +198,13 @@ class GetJsonAction(XlActionFunc):
                                                json.dumps(self.value, indent=2))
         if inputs[1]:  # “确定操作” 才更新属性
             self.value = json.loads(inputs[0])
+
+
+def get_root_widget(widget):
+    """ 从输入的组件找parent，一直往上检索到根结点
+    常用语从一个组件，追溯到起始的QMainWindow，mainwin
+    """
+    p = widget
+    while p.parent():
+        p = p.parent()
+    return p

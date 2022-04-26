@@ -5,6 +5,7 @@ from qtpy import QtWidgets
 from xllabelme import QT5
 from xllabelme.shape import Shape
 import xllabelme.utils
+from xllabelme.utils.qt import get_root_widget
 
 
 # TODO(unknown):
@@ -37,7 +38,7 @@ class Canvas(QtWidgets.QWidget):
 
     _fill_drawing = False
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, parent, *args, **kwargs):
         self.epsilon = kwargs.pop("epsilon", 10.0)
         self.double_click = kwargs.pop("double_click", "close")
         if self.double_click not in [None, "close"]:
@@ -47,7 +48,7 @@ class Canvas(QtWidgets.QWidget):
                 )
             )
         self.num_backups = kwargs.pop("num_backups", 10)
-        super(Canvas, self).__init__(*args, **kwargs)
+        super(Canvas, self).__init__(parent, *args, **kwargs)
         # Initialise local state.
         self.mode = self.EDIT
         self.shapes = []
@@ -73,7 +74,7 @@ class Canvas(QtWidgets.QWidget):
         self.prevhShape = None
         self.hVertex = None
         self.prevhVertex = None
-        self.hEdge = None
+        self.hEdge = None  # 前缀h应该是hovering over，鼠标悬停的意思，表示鼠标悬停在edge上
         self.prevhEdge = None
         self.movingShape = False
         self.snapping = True
@@ -87,6 +88,8 @@ class Canvas(QtWidgets.QWidget):
         # Set widget options.
         self.setMouseTracking(True)
         self.setFocusPolicy(QtCore.Qt.WheelFocus)
+
+        self.mainwin = get_root_widget(self)
 
     def fillDrawing(self):
         return self._fill_drawing
@@ -187,6 +190,7 @@ class Canvas(QtWidgets.QWidget):
 
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""
+        # 0 获取坐标位置
         try:
             if QT5:
                 pos = self.transformPos(ev.localPos())
@@ -198,7 +202,7 @@ class Canvas(QtWidgets.QWidget):
         self.prevMovePoint = pos
         self.restoreCursor()
 
-        # Polygon drawing.
+        # 1 Polygon drawing. 创建多边形的模式
         if self.drawing():
             self.line.shape_type = self.createMode
 
@@ -240,7 +244,7 @@ class Canvas(QtWidgets.QWidget):
             self.current.highlightClear()
             return
 
-        # Polygon copy moving.
+        # 2 Polygon copy moving.  右键拖拽polygon可复制框
         if QtCore.Qt.RightButton & ev.buttons():
             if self.selectedShapesCopy and self.prevPoint:
                 self.overrideCursor(CURSOR_MOVE)
@@ -253,7 +257,7 @@ class Canvas(QtWidgets.QWidget):
                 self.repaint()
             return
 
-        # Polygon/Vertex moving.
+        # 3 Polygon/Vertex moving.  # 左键移动顶点、多边形
         if QtCore.Qt.LeftButton & ev.buttons():
             if self.selectedVertex():
                 self.boundedMoveVertex(pos)
@@ -266,17 +270,22 @@ class Canvas(QtWidgets.QWidget):
                 self.movingShape = True
             return
 
+        # 4 如果在shapes外面，则给出整图相关的提示
         # Just hovering over the canvas, 2 possibilities:
         # - Highlight shapes
         # - Highlight vertex
         # Update shape/vertex fill and tooltip value accordingly.
-        self.setToolTip(self.tr("Image"))
+
+        # 非要我自己封装一个setStatusTip才能实时更新~~
+        self.mainwin.showMessage(self.mainwin.get_image_tip(pos))
+
+        # 5 否则如果鼠标在shape中，会有shape相关的提示
         for shape in reversed([s for s in self.shapes if self.isVisible(s)]):
             # Look for a nearby vertex to highlight. If that fails,
             # check if we happen to be inside a shape.
             index = shape.nearestVertex(pos, self.epsilon / self.scale)
             index_edge = shape.nearestEdge(pos, self.epsilon / self.scale)
-            if index is not None:
+            if index is not None:  # 悬停在顶点
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.prevhVertex = self.hVertex = index
@@ -289,7 +298,7 @@ class Canvas(QtWidgets.QWidget):
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
-            elif index_edge is not None and shape.canAddPoint():
+            elif index_edge is not None and shape.canAddPoint() and self.mainwin.check_add_point_to_edge:
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.prevhVertex = self.hVertex
@@ -301,7 +310,7 @@ class Canvas(QtWidgets.QWidget):
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
-            elif shape.containsPoint(pos):
+            elif shape.containsPoint(pos):  # 悬停在shape里面
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.prevhVertex = self.hVertex
@@ -309,10 +318,11 @@ class Canvas(QtWidgets.QWidget):
                 self.prevhShape = self.hShape = shape
                 self.prevhEdge = self.hEdge
                 self.hEdge = None
-                self.setToolTip(
-                    self.tr("Click & drag to move shape '%s'") % shape.label
-                )
-                self.setStatusTip(self.toolTip())
+                # self.setToolTip(
+                #     self.tr("Click & drag to move shape '%s'") % shape.label
+                # )
+                # self.setStatusTip(self.toolTip())
+                self.mainwin.showMessage(self.mainwin.get_shape_detail(shape, pos))
                 self.overrideCursor(CURSOR_GRAB)
                 self.update()
                 break
@@ -321,10 +331,6 @@ class Canvas(QtWidgets.QWidget):
         self.vertexSelected.emit(self.hVertex is not None)
 
     def addPointToEdge(self):
-        mainwin = self.parent().parent().parent()
-        if not mainwin.actions.add_point_to_edge.isChecked():
-            return
-
         shape = self.prevhShape
         index = self.prevhEdge
         point = self.prevMovePoint
@@ -385,7 +391,7 @@ class Canvas(QtWidgets.QWidget):
                         self.drawingPolygon.emit(True)
                         self.update()
             elif self.editing():
-                if self.selectedEdge():
+                if self.selectedEdge() and self.mainwin.check_add_point_to_edge:
                     self.addPointToEdge()
                 elif (
                     self.selectedVertex()
