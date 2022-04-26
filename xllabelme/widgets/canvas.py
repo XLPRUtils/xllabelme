@@ -277,7 +277,8 @@ class Canvas(QtWidgets.QWidget):
         # Update shape/vertex fill and tooltip value accordingly.
 
         # 非要我自己封装一个setStatusTip才能实时更新~~
-        self.mainwin.showMessage(self.mainwin.get_image_tip(pos))
+        self.mainwin.showMessage(self.mainwin.get_image_desc())
+        self.setToolTip(self.mainwin.get_pos_desc(pos))
 
         # 5 否则如果鼠标在shape中，会有shape相关的提示
         for shape in reversed([s for s in self.shapes if self.isVisible(s)]):
@@ -285,7 +286,7 @@ class Canvas(QtWidgets.QWidget):
             # check if we happen to be inside a shape.
             index = shape.nearestVertex(pos, self.epsilon / self.scale)
             index_edge = shape.nearestEdge(pos, self.epsilon / self.scale)
-            if index is not None:  # 悬停在顶点
+            if index is not None:  # 悬停接近顶点
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.prevhVertex = self.hVertex = index
@@ -299,6 +300,7 @@ class Canvas(QtWidgets.QWidget):
                 self.update()
                 break
             elif index_edge is not None and shape.canAddPoint() and self.mainwin.check_add_point_to_edge:
+                # 悬停在edge多边形边上
                 if self.selectedVertex():
                     self.hShape.highlightClear()
                 self.prevhVertex = self.hVertex
@@ -322,7 +324,7 @@ class Canvas(QtWidgets.QWidget):
                 #     self.tr("Click & drag to move shape '%s'") % shape.label
                 # )
                 # self.setStatusTip(self.toolTip())
-                self.mainwin.showMessage(self.mainwin.get_shape_detail(shape, pos))
+                self.mainwin.showMessage(self.mainwin.get_shape_desc(shape, pos))
                 self.overrideCursor(CURSOR_GRAB)
                 self.update()
                 break

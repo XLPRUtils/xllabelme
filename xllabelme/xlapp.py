@@ -29,6 +29,8 @@ from xllabelme.config.xllabellib import XlLabel
 from xllabelme.app import set_default_shape_colors, MainWindow
 
 from pyxllib.prog.newbie import round_int
+from pyxllib.file.specialist import XlPath
+from pyxllib.algo.shapelylib import ShapelyPolygon
 
 
 class XlMainWindow(MainWindow):
@@ -1060,14 +1062,17 @@ class XlMainWindow(MainWindow):
         """ 判断添加点到多边形edge上的功能是否有打开 """
         return self.add_point_to_edge_action.isChecked()
 
-    def __get_tips(self):
-        """ 各种悬停的只能提示 """
+    def __get_describe(self):
+        """ 各种悬停的智能提示 """
 
-    def get_pos_tip(self, pos):
+    def get_pos_desc(self, pos, brief=False):
         """ 当前光标所在位置的提示
 
         :param pos: 相对原图尺寸、位置的坐标点
 
+        光标位置、所在像素rgb值信息
+
+        因为左下角的状态栏不支持富文本格式，所以一般光标信息是加到ToolTip
         """
         # 1 坐标
         x, y = round(pos.x(), 2), round(pos.y(), 2)
@@ -1075,40 +1080,40 @@ class XlMainWindow(MainWindow):
         # 2 像素值
         h, w, _ = self.arr_image.shape
         if 0 <= x < w - 1 and 0 <= y < h - 1:
-            rgb = self.arr_image[round_int(y), round_int(x)].tolist()
-            tip += f'，rgb={rgb}'  # 也有可能是rgba，就会有4个值
+            rgb = self.arr_image[round_int(y), round_int(x)].tolist()  # 也有可能是rgba，就会有4个值
+            if brief:
+                tip += f'，rgb={rgb}'
+            else:
+                color_dot = f'<font color="#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}">●</font>'
+                tip += f'<br/>{color_dot}rgb={rgb}{color_dot}'
         return tip
 
-    def get_image_tip(self, pos=None):
+    def get_image_desc(self):
         """ 鼠标停留在图片上时的提示内容，原始默认是Image
 
         这个一般是设置到状态栏展示
         """
         canvas = self.canvas
         pixmap = canvas.pixmap
-        files_num, shapes_num = len(self.fileListWidget), len(self.canvas.shapes)
-        tip = f'files_num={files_num}；height×width={pixmap.height()}×{pixmap.width()}，' \
+        # files_num = len(self.fileListWidget)
+        filesize = XlPath(self.imagePath).size(human_readable=True)
+        shapes_num = len(self.canvas.shapes)
+        tip = f'本图信息：图片文件大小={filesize}, height×width={pixmap.height()}×{pixmap.width()}，' \
               f'scale={canvas.scale:.2}，shapes_num={shapes_num}'
-
-        if pos:
-            tip += '；' + self.get_pos_tip(pos)
-
         return tip
 
-    def get_image_tip_detail(self):
-        """ 更详细的shape相关的统计信息
-
-        我用这个来统计shapes的一些关键信息
-        """
-        return ''
-
-    def get_shape_detail(self, shape, pos=None):
-        tip = shape.shape_type
+    def get_shape_desc(self, shape, pos):
+        # 1 形状、坐标点（四舍五入保留整数值）
+        tip = 'shape信息：' + shape.shape_type
         tip += ' ' + str([(round_int(p.x()), round_int(p.y())) for p in shape.points])
+        # 2 如果有flags标记
         if shape.flags:
             tip += f'，{shape.flags}'
-        if pos:
-            tip += '；' + self.get_pos_tip(pos)
+        # 3 增加个area面积信息
+        poly = ShapelyPolygon.gen([(p.x(), p.y()) for p in shape.points])
+        tip += f'，area={poly.area:.0f}'
+        # + 坐标信息
+        tip += f'；{self.get_pos_desc(pos, True)}'
         return tip
 
     def showMessage(self, text):
