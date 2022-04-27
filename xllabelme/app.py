@@ -1509,7 +1509,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.status(self.tr("Error reading %s") % label_file)
                 return False
             self.imageData = self.labelFile.imageData
-            self.arr_image = utils.img_data_to_arr(self.imageData)  # ckz: 新增存储cv2的图片数据
             self.imagePath = osp.join(
                 osp.dirname(label_file),
                 self.labelFile.imagePath,
@@ -1521,6 +1520,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.imagePath = filename
             self.labelFile = None
         image = QtGui.QImage.fromData(self.imageData)
+        if self.imageData:  # ckz: 新增存储cv2的图片数据
+            self.arr_image = utils.img_data_to_arr(self.imageData)
 
         if image.isNull():
             formats = [

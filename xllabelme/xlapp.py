@@ -1074,11 +1074,14 @@ class XlMainWindow(MainWindow):
 
         因为左下角的状态栏不支持富文本格式，所以一般光标信息是加到ToolTip
         """
+        if not self.imagePath:
+            return ''
+
         # 1 坐标
         x, y = round(pos.x(), 2), round(pos.y(), 2)
         tip = f'pos(x={x}, y={y})'
         # 2 像素值
-        h, w, _ = self.arr_image.shape
+        h, w, _ = (0, 0, 0) if self.arr_image is None else self.arr_image.shape
         if 0 <= x < w - 1 and 0 <= y < h - 1:
             rgb = self.arr_image[round_int(y), round_int(x)].tolist()  # 也有可能是rgba，就会有4个值
             if brief:
@@ -1093,13 +1096,15 @@ class XlMainWindow(MainWindow):
 
         这个一般是设置到状态栏展示
         """
+        if not self.imagePath:
+            return ''
         canvas = self.canvas
         pixmap = canvas.pixmap
         # files_num = len(self.fileListWidget)
         filesize = XlPath(self.imagePath).size(human_readable=True)
         shapes_num = len(self.canvas.shapes)
         tip = f'本图信息：图片文件大小={filesize}, height×width={pixmap.height()}×{pixmap.width()}，' \
-              f'scale={canvas.scale:.2}，shapes_num={shapes_num}'
+              f'scale={canvas.scale:g}，shapes_num={shapes_num}'
         return tip
 
     def get_shape_desc(self, shape, pos):
