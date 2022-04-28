@@ -3,7 +3,7 @@ import os.path as osp
 import time
 
 from PyQt5.QtCore import QPointF
-from PyQt5.QtWidgets import QMenu, QAction
+from PyQt5.QtWidgets import QMenu, QAction, QFileDialog
 
 from pyxllib.file.specialist import XlPath
 from pyxllib.algo.geo import rect_bounds
@@ -84,7 +84,7 @@ class XlLabel:
         # 新建框的时候，是否自动识别文本内容
         self.auto_rec_text = False
         self.cur_img = {}  # 存储当前图片的ndarray数据。只有一条数据，k=图片路径，v=图片数据
-
+        self.image_root = None  # 图片所在目录。有特殊功能用途，用在json和图片没有放在同一个目录的情况。
         # 这里可以配置显示哪些可用项目标注，有时候可能会需要定制化
         self.reset()
         # self.config_label_menu()  # 配置界面
@@ -213,10 +213,21 @@ class XlLabel:
             a.triggered.connect(func)
             return a
 
+        def get_set_image_root_action():
+            a = QAction('设置图片所在目录', label_menu)
+
+            def func():
+                self.image_root = XlPath(QFileDialog.getExistingDirectory(self.image_root))
+                self.mainwin.importDirImages(self.mainwin.lastOpenDir)
+
+            a.triggered.connect(func)
+            return a
+
         label_menu = self.mainwin.menus.label
         label_menu.addMenu(get_task_menu())
         label_menu.addSeparator()
         label_menu.addAction(get_auto_rec_text_action())
+        label_menu.addAction(get_set_image_root_action())
 
     def parse_shape(self, shape):
         """ xllabelme相关扩展功能，常用的shape解析

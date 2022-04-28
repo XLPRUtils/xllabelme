@@ -33,6 +33,8 @@ from xllabelme.widgets import ToolBar
 from xllabelme.widgets import UniqueLabelQListWidget
 from xllabelme.widgets import ZoomWidget
 
+from pyxllib.file.specialist import XlPath
+
 
 # FIXME
 # - [medium] Set max zoom value to something big enough for FitWidth/Window
@@ -2044,22 +2046,37 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lastOpenDir = dirpath
         self.filename = None
         self.fileListWidget.clear()
-        for filename in self.scanAllImages(dirpath):
-            if pattern and pattern not in filename:
-                continue
-            label_file = osp.splitext(filename)[0] + ".json"
-            if self.output_dir:
-                label_file_without_path = osp.basename(label_file)
-                label_file = osp.join(self.output_dir, label_file_without_path)
-            item = QtWidgets.QListWidgetItem(filename)
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-            if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(
-                    label_file
-            ):
+
+        if self.xllabel.image_root is None:
+            for filename in self.scanAllImages(dirpath):
+                if pattern and pattern not in filename:
+                    continue
+                label_file = osp.splitext(filename)[0] + ".json"
+                if self.output_dir:
+                    label_file_without_path = osp.basename(label_file)
+                    label_file = osp.join(self.output_dir, label_file_without_path)
+                item = QtWidgets.QListWidgetItem(filename)
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(
+                        label_file
+                ):
+                    item.setCheckState(Qt.Checked)
+                else:
+                    item.setCheckState(Qt.Unchecked)
+                self.fileListWidget.addItem(item)
+        else:  # ckz，我要扩展一个读取json来展示图片的功能
+            root = self.xllabel.image_root
+            for label_file in XlPath(dirpath).rglob('*.json'):
+                data = label_file.read_json()
+                if 'imagePath' in data:
+                    filename = str(root / label_file.relpath(dirpath))
+                else:
+                    continue
+                item = QtWidgets.QListWidgetItem(filename)
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 item.setCheckState(Qt.Checked)
-            else:
-                item.setCheckState(Qt.Unchecked)
-            self.fileListWidget.addItem(item)
+                self.fileListWidget.addItem(item)
+
         self.openNextImg(load=load)
 
     def scanAllImages(self, folderPath):
