@@ -6,6 +6,8 @@ import os.path as osp
 import sys
 import yaml
 
+import cv2  # 这个库也要打包，所以import进来
+
 from qtpy import QtCore
 from qtpy import QtWidgets
 

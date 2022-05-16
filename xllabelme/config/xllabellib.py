@@ -11,6 +11,7 @@ from pyxllib.algo.pupil import make_index_function
 from pyxllib.prog.newbie import round_int
 from pyxllib.prog.pupil import DictTool
 from pyxllib.gui.qt import WaitMessageBox
+from xlproject.xlserverlib import XlServer
 
 from xllabelme import utils
 
@@ -18,12 +19,12 @@ _CONFIGS = {
     '文字通用':
         {'_attrs':
              [['text', 1, 'str'],
-              ['class', 1, 'str'],
-              ['kv', 1, 'str', ('other', 'key', 'value')],
-              ['type', 1, 'str', ('印刷体', '手写体', '其它')],
+              ['category', 1, 'str'],
+              ['text_kv', 1, 'str', ('other', 'key', 'value')],
+              ['text_type', 1, 'str', ('印刷体', '手写体', '其它')],
               ],
-         'label_line_color': ['class'],
-         'label_vertex_fill_color': ['kv']
+         'label_line_color': ['category'],
+         'label_vertex_fill_color': ['text_kv']
          },
     '核酸检测':
         {'_attrs':
@@ -33,6 +34,16 @@ _CONFIGS = {
               ],
          'label_shape_color': 'content_class'.split(','),
          'default_label': json.dumps({'text': '', 'content_class': '其它类', 'content_kv': 'value'}, ensure_ascii=False),
+         },
+    '三码合一入学判定':
+        {'_attrs':
+             [['text', 1, 'str'],
+              ["category", 1, "str", ("姓名", "身份证", "联系方式", "采样时间", "检测时间", "核酸结果",
+                                      "14天经过或途经", "健康码颜色", "其他类")],
+              ['text_kv', 1, 'str', ('key', 'value')],
+              ],
+         'label_shape_color': 'category'.split(','),
+         'default_label': json.dumps({'text': '', 'category': '其他类', 'text_kv': 'value'}, ensure_ascii=False),
          },
     'XlCoco': {
         '_attrs':
@@ -89,7 +100,8 @@ class XlLabel:
         self.reset()
         # self.config_label_menu()  # 配置界面
 
-        self.ppocr = None
+        # TODO 晚点这个要配置化，防止被大量盗用~~
+        self.xlserver = XlServer('118.195.202.82', token='xllabelmey^*A9ykj')
 
     def reset(self, mode=None):
         # 1 确定mode
@@ -154,7 +166,7 @@ class XlLabel:
         label = self.cfg.get('default_label', '')
         if self.auto_rec_text and shape:
             k = 'label' if 'label' in self.keys else 'text'
-            text, score = self.rec_text(self.mainwin.imagePath, shape.points)
+            text, score = self.rec_text(shape.points)
             label = self.set_label_attr(label, k, text)
             label = self.set_label_attr(label, 'score', score)
         return label
@@ -207,8 +219,6 @@ class XlLabel:
 
             def func(x):
                 self.auto_rec_text = x
-                if x:
-                    self.ensure_ppocr()
 
             a.triggered.connect(func)
             return a
@@ -351,7 +361,7 @@ class XlLabel:
                 x = self.set_label_attr(x, 'text', text)
         else:  # Shape结构
             if text is None:
-                if self.ppocr:
+                if self.auto_rec_text:
                     labelattr = self.get_labelattr(x.label)
                     labelattr['text'], labelattr['score'] = self.rec_text(x.points)
                     x.label = self.json_dumps(labelattr)
@@ -363,20 +373,14 @@ class XlLabel:
     def __smart_label(self):
         """ 智能标注相关 """
 
-    def ensure_ppocr(self):
-        if not hasattr(self, 'ppocr'):
-            with WaitMessageBox(self.mainwin, 'PaddleOCR模型初始化中，请稍等一会...'):
-                from pyxlpr.paddleocr import PaddleOCR
-                self.ppocr = PaddleOCR.build_ppocr()
-
     def rec_text(self, points):
-        from pyxllib.xlcv import xlcv
+        from pyxllib.cv.xlcvlib import xlcv
         # 识别指定的points区域
-        if isinstance(points, QPointF):
+        if isinstance(points[0], QPointF):
             points = [(p.x(), p.y()) for p in points]
         im = xlcv.get_sub(self.mainwin.arr_image, points, warp_quad=True)
-        text, score = self.ppocr.rec_singleline(im)
-        return text, score
+        text = self.xlserver.rec_singleline(im)
+        return text, -1
 
     def __right_click_shape(self):
         """ 扩展shape右键操作菜单功能

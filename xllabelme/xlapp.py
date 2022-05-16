@@ -30,7 +30,12 @@ from xllabelme.app import set_default_shape_colors, MainWindow
 
 from pyxllib.prog.newbie import round_int
 from pyxllib.file.specialist import XlPath
-from pyxllib.algo.shapelylib import ShapelyPolygon
+
+try:  # 该组件不是必须的
+    from shapely.geometry import Polygon
+    from pyxllib.algo.shapelylib import ShapelyPolygon
+except ModuleNotFoundError:
+    ShapelyPolygon = None
 
 
 class XlMainWindow(MainWindow):
@@ -1115,8 +1120,9 @@ class XlMainWindow(MainWindow):
         if shape.flags:
             tip += f'，{shape.flags}'
         # 3 增加个area面积信息
-        poly = ShapelyPolygon.gen([(p.x(), p.y()) for p in shape.points])
-        tip += f'，area={poly.area:.0f}'
+        if ShapelyPolygon:
+            poly = ShapelyPolygon.gen([(p.x(), p.y()) for p in shape.points])
+            tip += f'，area={poly.area:.0f}'
         # + 坐标信息
         tip += f'；{self.get_pos_desc(pos, True)}'
         return tip
