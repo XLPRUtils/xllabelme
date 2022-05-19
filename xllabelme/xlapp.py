@@ -31,11 +31,32 @@ from xllabelme.app import set_default_shape_colors, MainWindow
 from pyxllib.prog.newbie import round_int
 from pyxllib.file.specialist import XlPath
 
+from pyxllib.cv.rgbfmt import RgbFormatter
+
 try:  # 该组件不是必须的
     from shapely.geometry import Polygon
     from pyxllib.algo.shapelylib import ShapelyPolygon
 except ModuleNotFoundError:
     ShapelyPolygon = None
+
+# ckz relabel2项目定制映射
+_COLORS = {
+    '印刷体': '鲜绿色',
+    '手写体': '黄色',
+    '印章': '红色',
+    'old': '黑色'
+}
+_COLORS.update({'姓名': '黑色',
+                '身份证': '黄色',
+                '联系方式': '金色',
+                '采样时间': '浅天蓝',
+                '检测时间': '蓝色',
+                '核酸结果': '红色',
+                '14天经过或途经': '绿色',
+                '健康码颜色': '鲜绿色',
+                '其他类': '亮灰色'})
+
+_COLORS = {k: np.array(RgbFormatter.from_name(v).to_tuple(), 'uint8') for k, v in _COLORS.items()}
 
 
 class XlMainWindow(MainWindow):
@@ -978,10 +999,8 @@ class XlMainWindow(MainWindow):
 
     def _get_rgb_by_label(self, label):
         """ 该函数可以强制限定某些映射颜色 """
-        # ckz relabel2项目定制映射
-        colors = {'印刷体': (0, 255, 0), '手写体': (255, 255, 0), '印章': (255, 0, 0), 'old': (0, 0, 0)}
-        if label in colors:
-            return np.array(colors[label], dtype='uint8')
+        if label in _COLORS:
+            return _COLORS[label]
 
         # 原来的颜色配置代码
         if self._config["shape_color"] == "auto":

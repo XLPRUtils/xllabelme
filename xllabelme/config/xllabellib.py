@@ -26,7 +26,7 @@ _CONFIGS = {
          'label_line_color': ['category'],
          'label_vertex_fill_color': ['text_kv']
          },
-    '核酸检测':
+    '核酸检测':  # 这是比较旧的一套配置字段名
         {'_attrs':
              [['text', 1, 'str'],
               ["content_class", 1, "str", ("其它类", "姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果")],
