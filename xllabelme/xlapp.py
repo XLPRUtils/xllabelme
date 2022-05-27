@@ -566,8 +566,14 @@ class XlMainWindow(MainWindow):
 
         self.add_point_to_edge_action = utils.qt.newCheckableAction(
             self,
-            self.tr("Add Point to Edge"),
+            self.tr("Add Point to Edge Enable"),
             tip=self.tr("选中shape的edge时，增加分割点"),
+        )
+
+        self.delete_selected_shape_with_warning_action = utils.qt.newCheckableAction(
+            self,
+            self.tr("Delete Selected Shape With Warning"),
+            checked=True,
         )
 
         # Lavel list context menu.
@@ -634,6 +640,7 @@ class XlMainWindow(MainWindow):
                 toggle_keep_prev_mode,
                 None,
                 self.add_point_to_edge_action,
+                self.delete_selected_shape_with_warning_action,
             ),
             # menu shown at right click
             menu=(

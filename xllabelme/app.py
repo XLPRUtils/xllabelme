@@ -1953,9 +1953,8 @@ class MainWindow(QtWidgets.QMainWindow):
             "You are about to permanently delete {} polygons, "
             "proceed anyway?"
         ).format(len(self.canvas.selectedShapes))
-        if yes == QtWidgets.QMessageBox.warning(
-                self, self.tr("Attention"), msg, yes | no, yes
-        ):
+        if not self.delete_selected_shape_with_warning_action.isChecked() or \
+                yes == QtWidgets.QMessageBox.warning(self, self.tr("Attention"), msg, yes | no, yes):
             self.remLabels(self.canvas.deleteSelected())
             self.setDirty()
             if self.noShapes():

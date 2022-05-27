@@ -11,9 +11,10 @@ from pyxllib.algo.pupil import make_index_function
 from pyxllib.prog.newbie import round_int
 from pyxllib.prog.pupil import DictTool
 from pyxllib.gui.qt import WaitMessageBox
-from xlproject.xlserverlib import XlServer
+from xlproject.xlclientlib import XlClient
 
 from xllabelme import utils
+from pyxllib.prog.pupil import get_hostname
 
 _CONFIGS = {
     '文字通用':
@@ -101,7 +102,10 @@ class XlLabel:
         # self.config_label_menu()  # 配置界面
 
         # TODO 晚点这个要配置化，防止被大量盗用~~
-        self.xlserver = XlServer('118.195.202.82', token='xllabelmey^*A9ykj')
+        if get_hostname() == 'codepc-mi15':
+            self.xlserver = XlClient('172.16.170.134', token='ckz8cjZ8@D5')
+        else:
+            self.xlserver = XlClient('118.195.202.82', token='xllabelmey^*A9ykj')
 
     def reset(self, mode=None):
         # 1 确定mode
