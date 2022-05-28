@@ -8,13 +8,11 @@ from PyQt5.QtWidgets import QMenu, QAction, QFileDialog
 from pyxllib.file.specialist import XlPath
 from pyxllib.algo.geo import rect_bounds
 from pyxllib.algo.pupil import make_index_function
-from pyxllib.prog.newbie import round_int
 from pyxllib.prog.pupil import DictTool
-from pyxllib.gui.qt import WaitMessageBox
-from xlproject.xlclientlib import XlClient
+from pyxlpr.ai.clientlib import XlAiClient
 
 from xllabelme import utils
-from pyxllib.prog.pupil import get_hostname
+from pyxllib.prog.pupil import get_hostname, get_username
 
 _CONFIGS = {
     '文字通用':
@@ -102,10 +100,10 @@ class XlLabel:
         # self.config_label_menu()  # 配置界面
 
         # TODO 晚点这个要配置化，防止被大量盗用~~
-        if get_hostname() == 'codepc-mi15':
-            self.xlserver = XlClient('172.16.170.134', token='ckz8cjZ8@D5')
-        else:
-            self.xlserver = XlClient('118.195.202.82', token='xllabelmey^*A9ykj')
+        self.xlserver = XlAiClient()
+        self.xlserver.setup_priu('xllabelmey^*A9ykj', '118.195.202.82:5003')
+        if get_hostname() == 'codepc-mi15' and get_username() == 'chen':
+            self.xlserver.setup_priu('ckz8cjZ8@D5', '172.16.170.134:5003')
 
     def reset(self, mode=None):
         # 1 确定mode
