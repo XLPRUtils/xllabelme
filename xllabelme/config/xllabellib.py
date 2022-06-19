@@ -64,7 +64,7 @@ _CONFIGS = {
              ],
         'label_shape_color': 'category_id,content_class'.split(','),
         'label_line_color': 'gt_category_id,gt_category_name'.split(','),
-        'label_vertex_fill_color': 'dt_category_id,dt_category_name'.split(','),
+        'label_vertex_fill_color': 'dt_category_id,dt_category_name,content_kv'.split(','),
     },
     'Sroie2019+':
         {'_attrs':
@@ -101,7 +101,7 @@ class XlLabel:
 
         # TODO 晚点这个要配置化，防止被大量盗用~~
         self.xlserver = XlAiClient()
-        self.xlserver.setup_priu('xllabelmey^*A9ykj', '118.195.202.82:5003')
+        self.xlserver.setup_priu('xllabelmey^*A9ykj', '118.195.202.82:5010')
         if get_hostname() == 'codepc-mi15' and get_username() == 'chen':
             self.xlserver.setup_priu('ckz8cjZ8@D5', '172.16.170.134:5003')
 
