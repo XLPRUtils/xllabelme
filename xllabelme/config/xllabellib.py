@@ -1,4 +1,5 @@
 import json
+import os
 import os.path as osp
 import time
 
@@ -12,7 +13,6 @@ from pyxllib.prog.pupil import DictTool
 from pyxlpr.ai.clientlib import XlAiClient
 
 from xllabelme import utils
-from pyxllib.prog.pupil import get_hostname, get_username
 
 _CONFIGS = {
     '文字通用':
@@ -99,11 +99,8 @@ class XlLabel:
         self.reset()
         # self.config_label_menu()  # 配置界面
 
-        # TODO 晚点这个要配置化，防止被大量盗用~~
-        self.xlserver = XlAiClient()
-        self.xlserver.setup_priu('xllabelmey^*A9ykj', '118.195.202.82:5010')
-        if get_hostname() == 'codepc-mi15' and get_username() == 'chen':
-            self.xlserver.setup_priu('ckz8cjZ8@D5', '172.16.170.134:5003')
+        os.environ['XlAiAccounts'] = 'eyJwcml1IjogeyJ0b2tlbiI6ICJ4bGxhYmVsbWV5XipBOXlraiJ9fQ=='
+        self.xlapi = XlAiClient()
 
     def reset(self, mode=None):
         # 1 确定mode
@@ -381,7 +378,7 @@ class XlLabel:
         if isinstance(points[0], QPointF):
             points = [(p.x(), p.y()) for p in points]
         im = xlcv.get_sub(self.mainwin.arr_image, points, warp_quad=True)
-        text = self.xlserver.rec_singleline(im)
+        text = self.xlapi.rec_singleline(im)
         return text, -1
 
     def __right_click_shape(self):

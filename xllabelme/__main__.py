@@ -8,8 +8,9 @@ import yaml
 
 import cv2  # 这个库也要打包，所以import进来
 
-from qtpy import QtCore
-from qtpy import QtWidgets
+# from qtpy import QtCore
+# from qtpy import QtWidgets  # ckz 220831周三14:39，debug模式下运行有问题
+from PyQt5 import QtWidgets, QtCore
 
 from xllabelme import __appname__, __version__
 from xllabelme.xlapp import XlMainWindow

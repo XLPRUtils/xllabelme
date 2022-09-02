@@ -61,7 +61,10 @@ class LabelFile(object):
                 format = "JPEG"
             else:
                 format = "PNG"
-            image_pil.save(f, format=format)
+            try:  # ckz：有可能png图片误写成jpg，导致格式处理错
+                image_pil.save(f, format=format)
+            except OSError:
+                image_pil.save(f, format='PNG')
             f.seek(0)
             return f.read()
 
