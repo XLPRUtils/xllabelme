@@ -2,6 +2,9 @@ import json
 import os
 import os.path as osp
 import time
+from statistics import mean
+
+import requests
 
 from PyQt5.QtCore import QPointF
 from PyQt5.QtWidgets import QMenu, QAction, QFileDialog
@@ -91,16 +94,16 @@ class XlLabel:
                              'custom_modes': {}
                              }
 
-        # 新建框的时候，是否自动识别文本内容
-        self.auto_rec_text = False
+        self.auto_rec_text = False  # 新建框的时候，是否自动识别文本内容
+        # auto_rec_text和xlapi两个参数不是冗余，是分别有不同含义的，最好不要去尝试精简掉！
+        # auto_rec_text是设置上是否需要每次自动识别，xlapi是网络、api是否确实可用
+
         self.cur_img = {}  # 存储当前图片的ndarray数据。只有一条数据，k=图片路径，v=图片数据
         self.image_root = None  # 图片所在目录。有特殊功能用途，用在json和图片没有放在同一个目录的情况。
         # 这里可以配置显示哪些可用项目标注，有时候可能会需要定制化
         self.reset()
         # self.config_label_menu()  # 配置界面
-
-        os.environ['XlAiAccounts'] = 'eyJwcml1IjogeyJ0b2tlbiI6ICJ4bGxhYmVsbWV5XipBOXlraiJ9fQ=='
-        self.xlapi = XlAiClient()
+        self.xlapi = None
 
     def reset(self, mode=None):
         # 1 确定mode
@@ -163,7 +166,7 @@ class XlLabel:
         这里有办法获取原图，也有办法获取标注的shape，从而可以智能推断，给出识别值的
         """
         label = self.cfg.get('default_label', '')
-        if self.auto_rec_text and shape:
+        if self.auto_rec_text and self.xlapi and shape:
             k = 'label' if 'label' in self.keys else 'text'
             text, score = self.rec_text(shape.points)
             label = self.set_label_attr(label, k, text)
@@ -218,6 +221,14 @@ class XlLabel:
 
             def func(x):
                 self.auto_rec_text = x
+
+                if self.auto_rec_text:
+                    os.environ['XlAiAccounts'] = 'eyJwcml1IjogeyJ0b2tlbiI6ICJ4bGxhYmVsbWV5XipBOXlraiJ9fQ=='
+                    try:
+                        self.xlapi = XlAiClient()
+                    except ConnectionError:
+                        # 没有网络
+                        self.xlapi = None
 
             a.triggered.connect(func)
             return a
@@ -360,7 +371,7 @@ class XlLabel:
                 x = self.set_label_attr(x, 'text', text)
         else:  # Shape结构
             if text is None:
-                if self.auto_rec_text:
+                if self.auto_rec_text and self.xlapi:
                     labelattr = self.get_labelattr(x.label)
                     labelattr['text'], labelattr['score'] = self.rec_text(x.points)
                     x.label = self.json_dumps(labelattr)
@@ -378,8 +389,26 @@ class XlLabel:
         if isinstance(points[0], QPointF):
             points = [(p.x(), p.y()) for p in points]
         im = xlcv.get_sub(self.mainwin.arr_image, points, warp_quad=True)
-        text = self.xlapi.rec_singleline(im)
-        return text, -1
+
+        texts, scores = [], []  # 因图片太小等各种原因，没有识别到结果，默认就设空值
+        try:
+            d = self.xlapi.priu_api('common_ocr', im)
+            if 'shapes' in d:
+                texts = [sp['label']['text'] for sp in d['shapes']]
+                scores = [sp['label']['score'] for sp in d['shapes']]
+        except requests.exceptions.ConnectionError:
+            pass
+
+        text = ' '.join(texts)
+        if scores:
+            score = round(mean(scores), 4)
+        else:
+            score = -1
+
+        # if score == -1:
+        #     dprint(points, text, score, im.shape)
+
+        return text, score
 
     def __right_click_shape(self):
         """ 扩展shape右键操作菜单功能
@@ -444,7 +473,7 @@ class XlLabel:
 
                 # 2 调整label
                 # 如果开了识别模型，更新识别结果
-                if self.auto_rec_text:
+                if self.auto_rec_text and self.xlapi:
                     self.update_shape_text(shape)
                     self.update_shape_text(shape2)
                 else:  # 否则按几何比例重分配文本
