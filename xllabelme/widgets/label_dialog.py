@@ -1,5 +1,4 @@
 import re
-import json
 
 from qtpy import QT_VERSION
 from qtpy import QtCore
@@ -10,7 +9,7 @@ from xllabelme.logger import logger
 import xllabelme.utils
 from xllabelme.shape import Shape
 
-from pyxllib.gui.qt import get_input_widget, QHLine
+from pyxllib.extend.qt import get_input_widget, QHLine
 
 QT5 = QT_VERSION[0] == "5"
 
