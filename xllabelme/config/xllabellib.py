@@ -28,25 +28,48 @@ _CONFIGS = {
          'label_line_color': ['category'],
          'label_vertex_fill_color': ['text_kv']
          },
-    '核酸检测':  # 这是比较旧的一套配置字段名
+    'm2302阅深题库':  # 这是比较旧的一套配置字段名
         {'_attrs':
-             [['text', 1, 'str'],
-              ["content_class", 1, "str", ("其它类", "姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果")],
-              ['content_kv', 1, 'str', ('key', 'value')],
+             [['content_type', 1, 'str', ('印刷体', '手写体')],
+              ["content_class", 1, "str", ("文本", "公式", "图片", "表格")],
+              ['text', 1, 'str'],
               ],
-         'label_shape_color': 'content_class'.split(','),
-         'default_label': json.dumps({'text': '', 'content_class': '其它类', 'content_kv': 'value'}, ensure_ascii=False),
+         'label_shape_color': 'content_type,content_class'.split(','),
+         # 'label_vertex_fill_color': 'content_kv'.split(','),
+         'default_label': json.dumps({'content_type': '印刷体',
+                                      'content_class': '文本', 'text': ''}, ensure_ascii=False),
          },
-    '三码合一入学判定':
-        {'_attrs':
-             [['text', 1, 'str'],
-              ["category", 1, "str", ("姓名", "身份证", "联系方式", "采样时间", "检测时间", "核酸结果",
-                                      "14天经过或途经", "健康码颜色", "其他类")],
-              ['text_kv', 1, 'str', ('key', 'value')],
-              ],
-         'label_shape_color': 'category'.split(','),
-         'default_label': json.dumps({'text': '', 'category': '其他类', 'text_kv': 'value'}, ensure_ascii=False),
-         },
+    # '渊亭OCR':  # 这是比较旧的一套配置字段名
+    #     {'_attrs':
+    #          [['content_type', 1, 'str', ('印刷体', '手写体', '印章', '其它')],
+    #           ['content_kv', 1, 'str', ('key', 'value')],
+    #           ["content_class", 1, "str", ("姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果", "其它类")],
+    #           ['text', 1, 'str'],
+    #           ],
+    #      'label_shape_color': 'content_class'.split(','),
+    #      'label_vertex_fill_color': 'content_kv'.split(','),
+    #      'default_label': json.dumps({'content_type': '印刷体', 'content_kv': 'value',
+    #                                   'content_class': '其它类', 'text': ''}, ensure_ascii=False),
+    #      },
+    # '核酸检测':  # 这是比较旧的一套配置字段名
+    #     {'_attrs':
+    #          [['text', 1, 'str'],
+    #           ["content_class", 1, "str", ("其它类", "姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果")],
+    #           ['content_kv', 1, 'str', ('key', 'value')],
+    #           ],
+    #      'label_shape_color': 'content_class'.split(','),
+    #      'default_label': json.dumps({'text': '', 'content_class': '其它类', 'content_kv': 'value'}, ensure_ascii=False),
+    #      },
+    # '三码合一入学判定':
+    #     {'_attrs':
+    #          [['text', 1, 'str'],
+    #           ["category", 1, "str", ("姓名", "身份证", "联系方式", "采样时间", "检测时间", "核酸结果",
+    #                                   "14天经过或途经", "健康码颜色", "其他类")],
+    #           ['text_kv', 1, 'str', ('key', 'value')],
+    #           ],
+    #      'label_shape_color': 'category'.split(','),
+    #      'default_label': json.dumps({'text': '', 'category': '其他类', 'text_kv': 'value'}, ensure_ascii=False),
+    #      },
     'XlCoco': {
         '_attrs':
             [['id', 1, 'int'],
@@ -69,13 +92,13 @@ _CONFIGS = {
         'label_line_color': 'gt_category_id,gt_category_name'.split(','),
         'label_vertex_fill_color': 'dt_category_id,dt_category_name,content_kv'.split(','),
     },
-    'Sroie2019+':
-        {'_attrs':
-             [['text', 1, 'str'],  # 原来叫label的，改成text
-              ['sroie_class', 1, 'str', ('other', 'company', 'address', 'date', 'total')],
-              ['sroie_kv', 1, 'str', ('other', 'key', 'value')],
-              ]
-         },
+    # 'Sroie2019+':
+    #     {'_attrs':
+    #          [['text', 1, 'str'],  # 原来叫label的，改成text
+    #           ['sroie_class', 1, 'str', ('other', 'company', 'address', 'date', 'total')],
+    #           ['sroie_kv', 1, 'str', ('other', 'key', 'value')],
+    #           ]
+    #      },
 }
 
 
@@ -109,6 +132,8 @@ class XlLabel:
         # 1 确定mode
         if mode:
             self.meta_cfg['current_mode'] = mode
+        if self.meta_cfg['current_mode'] not in _CONFIGS:
+            self.meta_cfg['current_mode'] = '文字通用'
         mode = self.meta_cfg['current_mode']
 
         # 2 预设mode或自定义mode的详细配置

@@ -19,7 +19,7 @@ from qtpy import QT_VERSION
 __version__ = "5.0.1"
 
 # 2 扩展的更灵活的labelme，兼容官方的功能，但有更强的可视化效果，能查看shape的多个属性值
-version = '2.1.20.1'
+version = '2.1.22'
 __appname__ = f"xllabelme v{version}"
 
 QT4 = QT_VERSION[0] == "4"
