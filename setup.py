@@ -33,7 +33,7 @@ def get_install_requires():
 
     # 试了py3.6、py3.8，都是能编译exe成功的
     install_requires = [
-        "pyxllib>=0.2.63",
+        "pyxllib>=0.3.24",
         # "imgviz==1.2.1",  # 这个限定不用，新版imgviz又兼容了
         "imgviz>=0.11",
         "matplotlib<3.3",  # for PyInstaller

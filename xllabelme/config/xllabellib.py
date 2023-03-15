@@ -192,10 +192,13 @@ class XlLabel:
         """
         label = self.cfg.get('default_label', '')
         if self.auto_rec_text and self.xlapi and shape:
-            k = 'label' if 'label' in self.keys else 'text'
-            text, score = self.rec_text(shape.points)
-            label = self.set_label_attr(label, k, text)
-            label = self.set_label_attr(label, 'score', score)
+            if self.meta_cfg['current_mode'] == 'm2302阅深题库':
+                label = self.content_ocr(shape.points)
+            else:
+                k = 'label' if 'label' in self.keys else 'text'
+                text, score = self.rec_text(shape.points)
+                label = self.set_label_attr(label, k, text)
+                label = self.set_label_attr(label, 'score', score)
         return label
 
     def config_label_menu(self):
@@ -409,6 +412,7 @@ class XlLabel:
         """ 智能标注相关 """
 
     def rec_text(self, points):
+        """ 文字识别或者一些特殊的api接口 """
         from pyxllib.cv.xlcvlib import xlcv
         # 识别指定的points区域
         if isinstance(points[0], QPointF):
@@ -417,7 +421,7 @@ class XlLabel:
 
         texts, scores = [], []  # 因图片太小等各种原因，没有识别到结果，默认就设空值
         try:
-            d = self.xlapi.priu_api('common_ocr', im)
+            d = self.xlapi.priu_api('basicGeneral', im)
             if 'shapes' in d:
                 texts = [sp['label']['text'] for sp in d['shapes']]
                 scores = [sp['label']['score'] for sp in d['shapes']]
@@ -434,6 +438,22 @@ class XlLabel:
         #     dprint(points, text, score, im.shape)
 
         return text, score
+
+    def content_ocr(self, points):
+        """ 主要给"m2302阅深题库"用的 """
+        from pyxllib.cv.xlcvlib import xlcv
+        # 识别指定的points区域
+        if isinstance(points[0], QPointF):
+            points = [(p.x(), p.y()) for p in points]
+        im = xlcv.get_sub(self.mainwin.arr_image, points, warp_quad=True)
+
+        try:
+            d = self.xlapi.priu_api('content_ocr', im, filename=self.mainwin.filename)
+            label = json.dumps(d)
+        except requests.exceptions.ConnectionError:
+            label = _CONFIGS['m2302阅深题库']['default_label']
+
+        return label
 
     def __right_click_shape(self):
         """ 扩展shape右键操作菜单功能
