@@ -109,17 +109,8 @@ class XlLabel:
 
     def __init__(self, parent):
         self.mainwin = parent
-        self.configpath = XlPath.userdir() / ".xllabelme"
-        if self.configpath.is_file():
-            self.meta_cfg = self.configpath.read_json()
-        else:
-            self.meta_cfg = {'current_mode': '文字通用',
-                             'custom_modes': {}
-                             }
 
-        self.auto_rec_text = False  # 新建框的时候，是否自动识别文本内容
-        # auto_rec_text和xlapi两个参数不是冗余，是分别有不同含义的，最好不要去尝试精简掉！
-        # auto_rec_text是设置上是否需要每次自动识别，xlapi是网络、api是否确实可用
+        self.read_config()
 
         self.cur_img = {}  # 存储当前图片的ndarray数据。只有一条数据，k=图片路径，v=图片数据
         self.image_root = None  # 图片所在目录。有特殊功能用途，用在json和图片没有放在同一个目录的情况。
@@ -258,6 +249,8 @@ class XlLabel:
                         # 没有网络
                         self.xlapi = None
 
+                self.save_config()
+
             a.triggered.connect(func)
             return a
 
@@ -326,7 +319,23 @@ class XlLabel:
         else:
             return default
 
+    def read_config(self):
+        self.configpath = XlPath.userdir() / ".xllabelme"
+        if self.configpath.is_file():
+            self.meta_cfg = self.configpath.read_json()
+        else:
+            self.meta_cfg = {'current_mode': '文字通用',
+                             'custom_modes': {},
+                             'auto_rec_text': False,
+                             }
+        self.auto_rec_text = self.meta_cfg.get('auto_rec_text', False)  # 新建框的时候，是否自动识别文本内容
+        # auto_rec_text和xlapi两个参数不是冗余，是分别有不同含义的，最好不要去尝试精简掉！
+        # auto_rec_text是设置上是否需要每次自动识别，xlapi是网络、api是否确实可用
+
     def save_config(self):
+        if self.mainwin.lastOpenDir:
+            self.meta_cfg['lastOpenDir'] = XlPath(self.mainwin.lastOpenDir).as_posix()
+        self.meta_cfg['auto_rec_text'] = self.auto_rec_text
         self.configpath.write_json(self.meta_cfg, encoding='utf8', indent=2, ensure_ascii=False)
 
     def __labelattr(self):

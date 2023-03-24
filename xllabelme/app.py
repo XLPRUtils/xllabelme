@@ -1108,6 +1108,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if currIndex < len(self.imageList):
             filename = self.imageList[currIndex]
             if filename:
+                self.xllabel.meta_cfg['filename'] = filename
+                self.xllabel.save_config()
                 self.loadFile(filename)
 
     # React to canvas signals.
@@ -1704,7 +1706,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._config["keep_prev"] = keep_prev
 
-    def openNextImg(self, _value=False, load=True):
+    def openNextImg(self, _value=False, load=True, offset=1):
         keep_prev = self._config["keep_prev"]
         if QtWidgets.QApplication.keyboardModifiers() == (
                 Qt.ControlModifier | Qt.ShiftModifier
@@ -1722,8 +1724,8 @@ class MainWindow(QtWidgets.QMainWindow):
             filename = self.imageList[0]
         else:
             currIndex = self.imageList.index(self.filename)
-            if currIndex + 1 < len(self.imageList):
-                filename = self.imageList[currIndex + 1]
+            if currIndex + offset < len(self.imageList):
+                filename = self.imageList[currIndex + offset]
             else:
                 filename = self.imageList[-1]
         self.filename = filename
@@ -2035,7 +2037,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.openNextImg()
 
-    def importDirImages(self, dirpath, pattern=None, load=True):
+    def importDirImages(self, dirpath, pattern=None, load=True, filename=None, offset=1):
         self.actions.openNextImg.setEnabled(True)
         self.actions.openPrevImg.setEnabled(True)
 
@@ -2043,7 +2045,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         self.lastOpenDir = dirpath
-        self.filename = None
+        self.filename = filename
         self.fileListWidget.clear()
 
         if self.xllabel.image_root is None:
@@ -2076,7 +2078,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 item.setCheckState(Qt.Checked)
                 self.fileListWidget.addItem(item)
 
-        self.openNextImg(load=load)
+        self.openNextImg(load=load, offset=offset)
 
     def scanAllImages(self, folderPath):
         extensions = [

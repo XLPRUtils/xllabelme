@@ -50,7 +50,7 @@ class FileDialogPreview(QtWidgets.QFileDialog):
 
     def onChange(self, path):
         if path.lower().endswith(".json"):
-            with open(path, "r") as f:
+            with open(path, "r", encoding='utf8') as f:
                 data = json.load(f)
                 self.labelPreview.setText(
                     json.dumps(data, indent=4, sort_keys=False)

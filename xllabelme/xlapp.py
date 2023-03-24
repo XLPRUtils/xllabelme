@@ -752,7 +752,7 @@ class XlMainWindow(MainWindow):
         self.tools = self.toolbar("Tools")
         # Menu buttons on Left
         self.actions.tool = (
-            open_,
+            # open_,
             opendir,
             openNextImg,
             openPrevImg,
@@ -838,6 +838,8 @@ class XlMainWindow(MainWindow):
         # self.firstStart = True
         # if self.firstStart:
         #    QWhatsThis.enterWhatsThisMode()
+
+        self.open_last_workspace()
 
     def extendShapeMessage(self, shape):
         """ shape中自定义字段等信息
@@ -1158,3 +1160,14 @@ class XlMainWindow(MainWindow):
         显示值得用下述方式实现~~
         """
         self.statusBar().showMessage(text)
+
+    def open_last_workspace(self):
+        """ 打开上一次退出软件的工作空间状态 """
+        # 如果保存了目录和文件，打开上次工作状态
+        if 'lastOpenDir' in self.xllabel.meta_cfg:
+            d = XlPath(self.xllabel.meta_cfg['lastOpenDir'])
+            if d.is_dir():
+                if 'filename' in self.xllabel.meta_cfg:
+                    self.importDirImages(d, filename=self.xllabel.meta_cfg['filename'], offset=0)
+                else:
+                    self.importDirImages(d)
