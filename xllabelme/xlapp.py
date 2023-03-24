@@ -33,11 +33,8 @@ from pyxllib.file.specialist import XlPath
 
 from pyxllib.cv.rgbfmt import RgbFormatter
 
-try:  # 该组件不是必须的
-    from shapely.geometry import Polygon
-    from pyxllib.algo.shapelylib import ShapelyPolygon
-except ModuleNotFoundError:
-    ShapelyPolygon = None
+from pyxllib.algo.shapelylib import ShapelyPolygon
+
 
 # ckz relabel2项目定制映射
 _COLORS = {
@@ -1168,6 +1165,8 @@ class XlMainWindow(MainWindow):
             d = XlPath(self.xllabel.meta_cfg['lastOpenDir'])
             if d.is_dir():
                 if 'filename' in self.xllabel.meta_cfg:
-                    self.importDirImages(d, filename=self.xllabel.meta_cfg['filename'], offset=0)
+                    p = self.xllabel.meta_cfg['filename']
+                    if XlPath(p).is_file():
+                        self.importDirImages(d, filename=p, offset=0)
                 else:
                     self.importDirImages(d)
