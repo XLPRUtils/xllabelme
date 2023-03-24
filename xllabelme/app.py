@@ -1723,11 +1723,14 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.filename is None:
             filename = self.imageList[0]
         else:
-            currIndex = self.imageList.index(self.filename)
-            if currIndex + offset < len(self.imageList):
-                filename = self.imageList[currIndex + offset]
-            else:
-                filename = self.imageList[-1]
+            try:
+                currIndex = self.imageList.index(self.filename)
+                if currIndex + offset < len(self.imageList):
+                    filename = self.imageList[currIndex + offset]
+                else:
+                    filename = self.imageList[-1]
+            except ValueError:  # 找不到则默认用第1个
+                filename = self.imageList[0]
         self.filename = filename
 
         if self.filename and load:

@@ -1165,8 +1165,8 @@ class XlMainWindow(MainWindow):
             d = XlPath(self.xllabel.meta_cfg['lastOpenDir'])
             if d.is_dir():
                 if 'filename' in self.xllabel.meta_cfg:
-                    p = self.xllabel.meta_cfg['filename']
-                    if XlPath(p).is_file():
-                        self.importDirImages(d, filename=p, offset=0)
-                else:
-                    self.importDirImages(d)
+                    p = XlPath(self.xllabel.meta_cfg['filename'])
+                    if p.is_file():
+                        self.importDirImages(d, filename=str(p), offset=0)
+                        return
+                self.importDirImages(d)
