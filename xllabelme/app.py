@@ -1993,7 +1993,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QFileDialog.getExistingDirectory(
                 self,
                 self.tr("%s - Open Directory") % __appname__,
-                defaultOpenDirPath,
+                str(defaultOpenDirPath),
                 QtWidgets.QFileDialog.ShowDirsOnly
                 | QtWidgets.QFileDialog.DontResolveSymlinks,
             )

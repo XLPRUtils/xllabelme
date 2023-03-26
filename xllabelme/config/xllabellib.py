@@ -28,7 +28,7 @@ _CONFIGS = {
          'label_line_color': ['category'],
          'label_vertex_fill_color': ['text_kv']
          },
-    'm2302阅深题库':  # 这是比较旧的一套配置字段名
+    'm2302中科院题库':  # 这是比较旧的一套配置字段名
         {'_attrs':
              [['content_type', 1, 'str', ('印刷体', '手写体')],
               ["content_class", 1, "str", ("文本", "公式", "图片", "表格")],
@@ -331,6 +331,9 @@ class XlLabel:
         self.auto_rec_text = self.meta_cfg.get('auto_rec_text', False)  # 新建框的时候，是否自动识别文本内容
         # auto_rec_text和xlapi两个参数不是冗余，是分别有不同含义的，最好不要去尝试精简掉！
         # auto_rec_text是设置上是否需要每次自动识别，xlapi是网络、api是否确实可用
+
+        if self.meta_cfg['current_mode'] == 'm2302阅深题库':
+            self.meta_cfg['current_mode'] = 'm2302中科院题库'
 
     def save_config(self):
         if self.mainwin.lastOpenDir:
