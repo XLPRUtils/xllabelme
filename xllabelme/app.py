@@ -1329,53 +1329,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Callback functions:
 
     def newShape(self):
-        """Pop-up and give focus to the label editor.
-
-        position MUST be in global coordinates.
-        """
-        from xllabelme.config.xllabellib import GetDefaultLabel
-
-        items = self.uniqLabelList.selectedItems()
-        text = None
-        if items:
-            text = items[0].data(Qt.UserRole)
-        flags = {}
-        group_id = None
-        if self._config["display_label_popup"] or not text:
-            previous_text = self.labelDialog.edit.text()
-
-            if True:  # 使用我的xllabelme，会把数据全部都强制升为字典，不再考虑兼容label原版格式，这样很多扩展功能开发会简洁的多
-                shape = Shape()
-                shape.label = GetDefaultLabel(self)(shape=self.canvas.shapes[-1])
-                shape = self.labelDialog.popUp2(shape, self)
-                if shape is not None:
-                    text, flags, group_id = shape.label, shape.flags, shape.group_id
-            else:
-                text, flags, group_id = self.labelDialog.popUp(text)
-
-            if not text:
-                self.labelDialog.edit.setText(previous_text)
-
-        if text and not self.validateLabel(text):
-            self.errorMessage(
-                self.tr("Invalid label"),
-                self.tr("Invalid label '{}' with validation type '{}'").format(
-                    text, self._config["validate_label"]
-                ),
-            )
-            text = ""
-        if text:
-            self.labelList.clearSelection()
-            shape = self.canvas.setLastLabel(text, flags)
-            shape.group_id = group_id
-            self.addLabel(shape)
-            self.actions.editMode.setEnabled(True)
-            self.actions.undoLastPoint.setEnabled(False)
-            self.actions.undo.setEnabled(True)
-            self.setDirty()
-        else:
-            self.canvas.undoLastLine()
-            self.canvas.shapesBackups.pop()
+        self.project.new_shape()
 
     def scrollRequest(self, delta, orientation):
         units = -delta * 0.1  # natural scroll

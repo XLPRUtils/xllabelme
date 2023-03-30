@@ -9,26 +9,23 @@ import requests
 
 from PyQt5.QtCore import QPointF
 from PyQt5.QtWidgets import QMenu, QAction, QFileDialog, QMessageBox
+from qtpy import QtGui
+from qtpy.QtCore import Qt
 
 from pyxllib.file.specialist import XlPath
 from pyxllib.algo.geo import rect_bounds
 from pyxllib.algo.pupil import make_index_function
 from pyxllib.prog.pupil import DictTool
 from pyxlpr.ai.clientlib import XlAiClient
+from pyxllib.algo.shapelylib import ShapelyPolygon
 
 from xllabelme import utils
+from xllabelme.widgets import LabelListWidgetItem
+from xllabelme.shape import Shape
 
 _CONFIGS = {
-    '文字通用':
-        {'_attrs':
-             [['text', 1, 'str'],
-              ['category', 1, 'str'],
-              ['text_kv', 1, 'str', ('other', 'key', 'value')],
-              ['text_type', 1, 'str', ('印刷体', '手写体', '其它')],
-              ],
-         'label_line_color': ['category'],
-         'label_vertex_fill_color': ['text_kv']
-         },
+    '原版labelme': {},
+    'xllabelme': {},
     'm2302中科院题库':  # 这是比较旧的一套配置字段名
         {'_attrs':
              [['line_id', 1, 'int'],
@@ -75,6 +72,16 @@ _CONFIGS = {
     #      'label_shape_color': 'category'.split(','),
     #      'default_label': json.dumps({'text': '', 'category': '其他类', 'text_kv': 'value'}, ensure_ascii=False),
     #      },
+    '文字通用':
+        {'_attrs':
+             [['text', 1, 'str'],
+              ['category', 1, 'str'],
+              ['text_kv', 1, 'str', ('other', 'key', 'value')],
+              ['text_type', 1, 'str', ('印刷体', '手写体', '其它')],
+              ],
+         'label_line_color': ['category'],
+         'label_vertex_fill_color': ['text_kv']
+         },
     'XlCoco': {
         '_attrs':
             [['id', 1, 'int'],
@@ -107,40 +114,235 @@ _CONFIGS = {
 }
 
 
-class ModeBase:
-    """ 进行 """
+def __1_自定义项目():
+    pass
 
 
-class SwitchMode:
-    """ 切换不同模式的时候，需要执行的操作 """
-    def __init__(self, mainwin):
-        self.mainwin = mainwin
-
-    def init_default(self, mode):
-        pass
-
-    def init_m2302中科院题库(self, mode):
-        pass
-
-    def close_default(self, mode):
-        """ 关闭某种模式时需要执行的操作 """
-        pass
-
-    def close_m2302中科院题库(self, mode):
-        pass
-
-
-class GetDefaultLabel:
-    """ 新建框的时候，使用的默认label值
-
-    在这里可以定制不同项目生成新标注框的规则
-    这里有办法获取原图，也有办法获取标注的shape，从而可以智能推断，给出识别值的
+class 原版labelme:
+    """ 不同项目任务可以继承这个类，进行一些功能的定制
+    这里设计默认是labelme原版功能
     """
 
     def __init__(self, mainwin):
         self.mainwin = mainwin
+        self.xllabel = mainwin.xllabel
 
-    def default(self, shape=None):
+    def destroy(self):
+        """ 销毁项目相关配置 """
+        pass
+
+    def update_shape(self, shape, label_list_item=None):
+        """
+        :param shape:
+        :param label_list_item: item是shape的父级，挂在labelList下的项目
+        """
+        mainwin = self.mainwin
+        label_list_item = LabelListWidgetItem(shape.label, shape)
+        hashtext = shape.label
+
+        def parse_htext(htext):
+            if htext and not mainwin.uniqLabelList.findItemsByLabel(htext):
+                item = mainwin.uniqLabelList.createItemFromLabel(htext)
+                mainwin.uniqLabelList.addItem(item)
+                rgb = mainwin._get_rgb_by_label(htext)
+                mainwin.uniqLabelList.setItemLabel(item, htext, rgb)
+                return rgb
+            elif htext:
+                return mainwin._get_rgb_by_label(htext)
+            else:
+                return None
+
+        parse_htext(hashtext)
+        mainwin.labelDialog.addLabelHistory(hashtext)
+
+        mainwin._update_shape_color(shape)
+
+        return label_list_item
+
+    def new_shape(self):
+        """Pop-up and give focus to the label editor.
+
+        position MUST be in global coordinates.
+        """
+        mainwin = self.mainwin
+        items = mainwin.uniqLabelList.selectedItems()
+        text = None
+        if items:
+            text = items[0].data(Qt.UserRole)
+        flags = {}
+        group_id = None
+        if mainwin._config["display_label_popup"] or not text:
+            previous_text = mainwin.labelDialog.edit.text()
+
+            text = self.get_default_label(shape=mainwin.canvas.shapes[-1])
+            text, flags, group_id = mainwin.labelDialog.popUp(text)
+
+            if not text:
+                mainwin.labelDialog.edit.setText(previous_text)
+
+        if text and not mainwin.validateLabel(text):
+            mainwin.errorMessage(
+                mainwin.tr("Invalid label"),
+                mainwin.tr("Invalid label '{}' with validation type '{}'").format(
+                    text, mainwin._config["validate_label"]
+                ),
+            )
+            text = ""
+        if text:
+            mainwin.labelList.clearSelection()
+            shape = mainwin.canvas.setLastLabel(text, flags)
+            shape.group_id = group_id
+            mainwin.addLabel(shape)
+            mainwin.actions.editMode.setEnabled(True)
+            mainwin.actions.undoLastPoint.setEnabled(False)
+            mainwin.actions.undo.setEnabled(True)
+            mainwin.setDirty()
+        else:
+            mainwin.canvas.undoLastLine()
+            mainwin.canvas.shapesBackups.pop()
+
+    def get_default_label(self, shape=None):
+        """ 新建框的时候，使用的默认label值
+
+        在这里可以定制不同项目生成新标注框的规则
+        这里有办法获取原图，也有办法获取标注的shape，从而可以智能推断，给出识别值的
+        """
+        return self.mainwin.labelDialog.edit.text()
+
+
+class xllabelme(原版labelme):
+    """ xllabelme扩展功能 """
+
+    def __init__(self, mainwin):
+        super().__init__(mainwin)
+        self.xllabel = mainwin.xllabel
+
+    def update_shape(self, shape, label_list_item=None):
+        """
+        :param shape:
+        :param label_list_item: item是shape的父级，挂在labelList下的项目
+        """
+        mainwin = self.mainwin
+        # 1 确定显示的文本 text
+        self.xllabel.update_other_data(shape)
+        showtext, hashtext, labelattr = self.xllabel.parse_shape(shape)
+        if label_list_item:
+            label_list_item.setText(showtext)
+        else:
+            label_list_item = LabelListWidgetItem(showtext, shape)
+
+        # 2 保存label处理历史
+        def parse_htext(htext):
+            if htext and not mainwin.uniqLabelList.findItemsByLabel(htext):
+                item = mainwin.uniqLabelList.createItemFromLabel(htext)
+                mainwin.uniqLabelList.addItem(item)
+                rgb = mainwin._get_rgb_by_label(htext)
+                mainwin.uniqLabelList.setItemLabel(item, htext, rgb)
+                return rgb
+            elif htext:
+                return mainwin._get_rgb_by_label(htext)
+            else:
+                return None
+
+        parse_htext(hashtext)
+        mainwin.labelDialog.addLabelHistory(hashtext)
+        for action in mainwin.actions.onShapesPresent:
+            action.setEnabled(True)
+
+        # 3 定制颜色
+        # 如果有定制颜色，则取用户设置的r, g, b作为shape颜色
+        # 否则按照官方原版labelme的方式，通过label哈希设置
+        hash_colors = mainwin._get_rgb_by_label(hashtext)
+        r, g, b = 0, 0, 0
+
+        def seleter(key, default=None):
+            if default is None:
+                default = [r, g, b]
+
+            if key in labelattr:
+                v = labelattr[key]
+            else:
+                v = None
+
+            if v:
+                if len(v) == 3 and len(default) == 4:
+                    # 如果默认值有透明通道，而设置的时候只写了rgb，没有写alpha通道，则增设默认的alpha透明度
+                    v.append(default[-1])
+                for i in range(len(v)):
+                    if v[i] == -1:  # 用-1标记的位，表示用原始的hash映射值
+                        v[i] = hash_colors[i]
+                return v
+            else:
+                return default
+
+        r, g, b = seleter('shape_color', hash_colors.tolist())[:3]
+        label_list_item.setText(
+            '{} <font color="#{:02x}{:02x}{:02x}">●</font>'.format(
+                showtext, r, g, b
+            )
+        )
+
+        # 注意，只有用shape_color才能全局调整颜色，下面六个属性是单独调的
+        # 线的颜色
+        rgb_ = parse_htext(mainwin.xllabel.get_hashtext(labelattr, 'label_line_color'))
+        shape.line_color = QtGui.QColor(*seleter('line_color', rgb_))
+        # 顶点颜色
+        rgb_ = parse_htext(mainwin.xllabel.get_hashtext(labelattr, 'label_vertex_fill_color'))
+        shape.vertex_fill_color = QtGui.QColor(*seleter('vertex_fill_color', rgb_))
+        # 悬停时顶点颜色
+        shape.hvertex_fill_color = QtGui.QColor(*seleter('hvertex_fill_color', (255, 255, 255)))
+        # 填充颜色
+        shape.fill_color = QtGui.QColor(*seleter('fill_color', (r, g, b, 128)))
+        # 选中时的线、填充颜色
+        shape.select_line_color = QtGui.QColor(*seleter('select_line_color', (255, 255, 255)))
+        shape.select_fill_color = QtGui.QColor(*seleter('select_fill_color', (r, g, b, 155)))
+
+        return label_list_item
+
+    def new_shape(self):
+        """ 新建标注框时的规则
+        """
+        mainwin = self.mainwin
+        items = mainwin.uniqLabelList.selectedItems()
+        text = None
+        if items:
+            text = items[0].data(Qt.UserRole)
+        flags = {}
+        group_id = None
+        if mainwin._config["display_label_popup"] or not text:
+            previous_text = mainwin.labelDialog.edit.text()
+
+            shape = Shape()
+            shape.label = self.get_default_label(shape=mainwin.canvas.shapes[-1])
+            shape = mainwin.labelDialog.popUp2(shape, mainwin)
+            if shape is not None:
+                text, flags, group_id = shape.label, shape.flags, shape.group_id
+
+            if not text:
+                mainwin.labelDialog.edit.setText(previous_text)
+
+        if text and not mainwin.validateLabel(text):
+            mainwin.errorMessage(
+                mainwin.tr("Invalid label"),
+                mainwin.tr("Invalid label '{}' with validation type '{}'").format(
+                    text, mainwin._config["validate_label"]
+                ),
+            )
+            text = ""
+        if text:
+            mainwin.labelList.clearSelection()
+            shape = mainwin.canvas.setLastLabel(text, flags)
+            shape.group_id = group_id
+            mainwin.addLabel(shape)
+            mainwin.actions.editMode.setEnabled(True)
+            mainwin.actions.undoLastPoint.setEnabled(False)
+            mainwin.actions.undo.setEnabled(True)
+            mainwin.setDirty()
+        else:
+            mainwin.canvas.undoLastLine()
+            mainwin.canvas.shapesBackups.pop()
+
+    def get_default_label(self, shape=None):
         xllabel = self.mainwin.xllabel
         label = xllabel.cfg.get('default_label', '')
         if xllabel.auto_rec_text and xllabel.xlapi and shape:
@@ -150,7 +352,15 @@ class GetDefaultLabel:
             label = xllabel.set_label_attr(label, 'score', score)
         return label
 
-    def m2302中科院题库(self, shape):
+
+class 文字通用(xllabelme):
+    def get_default_label(self, shape=None):
+        d = {'text': '', 'category': '', 'text_kv': 'value', 'text_type': '印刷体'}
+        return json.dumps(d, ensure_ascii=False)
+
+
+class m2302中科院题库(xllabelme):
+    def get_default_label(self, shape=None):
         from pyxllib.cv.xlcvlib import xlcv
         from pyxlpr.data.imtextline import TextlineShape
 
@@ -166,15 +376,15 @@ class GetDefaultLabel:
                 d = xllabel.xlapi.priu_api('content_ocr', im, filename=xllabel.mainwin.filename)
             except requests.exceptions.ConnectionError:
                 pass
-        if d is None:
-            d = json.loads(_CONFIGS['m2302中科院题库']['default_label'])
+        if d is None:  # 设默认值
+            d = {'line_id': 1, 'content_type': '印刷体', 'content_class': '文本', 'text': ''}
 
         # 2 获得line_id
         line_id = 1
         shapes = xllabel.mainwin.canvas.shapes  # 最后一个框
-        if len(shapes) > 2:
+        if len(shapes) > 1:
             sp = shapes[-2]  # 当前框会变成shapes[-1]，所以要取shapes[-2]才是上一次建立的框
-            line_id0 = json.loads(sp.label)['line_id']
+            line_id0 = json.loads(sp.label).get('line_id', 1)
             if TextlineShape(points).in_the_same_line(TextlineShape([(p.x(), p.y()) for p in sp.points])):
                 line_id = line_id0
             else:
@@ -183,12 +393,25 @@ class GetDefaultLabel:
 
         return json.dumps(d, ensure_ascii=False)
 
-    def __call__(self, shape=None):
-        """ 入口，根据不同的配置选择不同的模式
 
-        :param shape: 可以输入一个shape供参考
-        """
-        return getattr(self, self.mainwin.xllabel.meta_cfg['current_mode'], 'default')(shape)
+class m2303表格标注(原版labelme):
+    def get_default_label(self, shape=None):
+        """ 这个识别可以做的更精细的，不过这个项目不一定接，现在只做一个最基础性的功能 """
+        # 表格, 可见横线, 可见竖线, 不可见横线, 不可见竖线
+
+        poly = ShapelyPolygon.gen([(p.x(), p.y()) for p in shape.points])
+        bounds = poly.bounds
+        width = bounds[2] - bounds[0]
+        height = bounds[3] - bounds[1]
+
+        if height > width:
+            return '可见竖线'
+        else:
+            return '可见横线'
+
+
+def __2_xllabel中介组件():
+    pass
 
 
 class XlLabel:
@@ -211,6 +434,11 @@ class XlLabel:
 
     def reset(self, mode=None):
         """ 更新配置 """
+        # 0 旧项目相关配置要回退
+        project = getattr(self.mainwin, 'project', None)
+        if project:
+            project.destroy()
+
         # 1 确定mode
         if mode:
             self.meta_cfg['current_mode'] = mode
@@ -270,6 +498,10 @@ class XlLabel:
         if ms:
             idx = self.default_shape_color_mode % len(ms)
             self.cfg['label_shape_color'] = self.cfg[ms[idx]]
+
+        # 6 设置项目
+        if project:
+            self.mainwin.project = self.open_project()
 
     def config_label_menu(self):
         """ Label菜单栏
@@ -434,7 +666,7 @@ class XlLabel:
         """ label相关的操作
 
         labelme原始的格式，每个shape里的label字段存储的是一个str类型
-        我为了扩展灵活性，在保留起str类型的前提下，存储的是一串可以解析为json字典的数据
+        我为了扩展灵活性，在保留其str类型的前提下，存储的是一串可以解析为json字典的数据
         前者称为labelstr类型，后者称为labelattr格式
 
         下面封装了一些对label、labelattr进行操作的功能
@@ -680,3 +912,10 @@ class XlLabel:
         tip += '当前配置：' + ', '.join(self.cfg['label_shape_color'])
         act.setStatusTip(tip)
         act.setToolTip(tip)
+
+    def open_project(self):
+        try:
+            project = eval(self.mainwin.xllabel.meta_cfg['current_mode'])(self.mainwin)
+        except NameError:
+            project = 原版labelme(self.mainwin)
+        return project

@@ -860,6 +860,8 @@ class XlMainWindow(MainWindow):
 
         self.open_last_workspace()
 
+        self.project = self.xllabel.open_project()
+
     def extendShapeMessage(self, shape):
         """ shape中自定义字段等信息
 
@@ -945,85 +947,7 @@ class XlMainWindow(MainWindow):
             self.updateShape(item.shape(), item)
 
     def updateShape(self, shape, label_list_item=None):
-        """
-        :param shape:
-        :param label_list_item: item是shape的父级，挂在labelList下的项目
-        """
-        # 1 确定显示的文本 text
-        self.xllabel.update_other_data(shape)
-        showtext, hashtext, labelattr = self.xllabel.parse_shape(shape)
-        if label_list_item:
-            label_list_item.setText(showtext)
-        else:
-            label_list_item = LabelListWidgetItem(showtext, shape)
-
-        # 2 保存label处理历史
-        def parse_htext(htext):
-            if htext and not self.uniqLabelList.findItemsByLabel(htext):
-                item = self.uniqLabelList.createItemFromLabel(htext)
-                self.uniqLabelList.addItem(item)
-                rgb = self._get_rgb_by_label(htext)
-                self.uniqLabelList.setItemLabel(item, htext, rgb)
-                return rgb
-            elif htext:
-                return self._get_rgb_by_label(htext)
-            else:
-                return None
-
-        parse_htext(hashtext)
-        self.labelDialog.addLabelHistory(hashtext)
-        for action in self.actions.onShapesPresent:
-            action.setEnabled(True)
-
-        # 3 定制颜色
-        # 如果有定制颜色，则取用户设置的r, g, b作为shape颜色
-        # 否则按照官方原版labelme的方式，通过label哈希设置
-        hash_colors = self._get_rgb_by_label(hashtext)
-        r, g, b = 0, 0, 0
-
-        def seleter(key, default=None):
-            if default is None:
-                default = [r, g, b]
-
-            if key in labelattr:
-                v = labelattr[key]
-            else:
-                v = None
-
-            if v:
-                if len(v) == 3 and len(default) == 4:
-                    # 如果默认值有透明通道，而设置的时候只写了rgb，没有写alpha通道，则增设默认的alpha透明度
-                    v.append(default[-1])
-                for i in range(len(v)):
-                    if v[i] == -1:  # 用-1标记的位，表示用原始的hash映射值
-                        v[i] = hash_colors[i]
-                return v
-            else:
-                return default
-
-        r, g, b = seleter('shape_color', hash_colors.tolist())[:3]
-        label_list_item.setText(
-            '{} <font color="#{:02x}{:02x}{:02x}">●</font>'.format(
-                showtext, r, g, b
-            )
-        )
-
-        # 注意，只有用shape_color才能全局调整颜色，下面六个属性是单独调的
-        # 线的颜色
-        rgb_ = parse_htext(self.xllabel.get_hashtext(labelattr, 'label_line_color'))
-        shape.line_color = QtGui.QColor(*seleter('line_color', rgb_))
-        # 顶点颜色
-        rgb_ = parse_htext(self.xllabel.get_hashtext(labelattr, 'label_vertex_fill_color'))
-        shape.vertex_fill_color = QtGui.QColor(*seleter('vertex_fill_color', rgb_))
-        # 悬停时顶点颜色
-        shape.hvertex_fill_color = QtGui.QColor(*seleter('hvertex_fill_color', (255, 255, 255)))
-        # 填充颜色
-        shape.fill_color = QtGui.QColor(*seleter('fill_color', (r, g, b, 128)))
-        # 选中时的线、填充颜色
-        shape.select_line_color = QtGui.QColor(*seleter('select_line_color', (255, 255, 255)))
-        shape.select_fill_color = QtGui.QColor(*seleter('select_fill_color', (r, g, b, 155)))
-
-        return label_list_item
+        return self.project.update_shape(shape, label_list_item)
 
     def _get_rgb_by_label(self, label):
         """ 该函数可以强制限定某些映射颜色 """
