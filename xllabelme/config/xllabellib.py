@@ -2,12 +2,13 @@ import json
 import os
 import os.path as osp
 import time
+import re
 from statistics import mean
 
 import requests
 
 from PyQt5.QtCore import QPointF
-from PyQt5.QtWidgets import QMenu, QAction, QFileDialog
+from PyQt5.QtWidgets import QMenu, QAction, QFileDialog, QMessageBox
 
 from pyxllib.file.specialist import XlPath
 from pyxllib.algo.geo import rect_bounds
@@ -30,15 +31,19 @@ _CONFIGS = {
          },
     'm2302中科院题库':  # 这是比较旧的一套配置字段名
         {'_attrs':
-             [['content_type', 1, 'str', ('印刷体', '手写体')],
+             [['line_id', 1, 'int'],
+              ['content_type', 1, 'str', ('印刷体', '手写体')],
               ["content_class", 1, "str", ("文本", "公式", "图片", "表格")],
               ['text', 1, 'str'],
               ],
          'label_shape_color': 'content_type,content_class'.split(','),
-         # 'label_vertex_fill_color': 'content_kv'.split(','),
-         'default_label': json.dumps({'content_type': '印刷体',
-                                      'content_class': '文本', 'text': ''}, ensure_ascii=False),
+         'label_shape_color2': ['line_id'],
+         'default_label': json.dumps({'line_id': 1,
+                                      'content_type': '印刷体',
+                                      'content_class': '文本',
+                                      'text': ''}, ensure_ascii=False),
          },
+    'm2303表格标注': {},
     # '渊亭OCR':  # 这是比较旧的一套配置字段名
     #     {'_attrs':
     #          [['content_type', 1, 'str', ('印刷体', '手写体', '印章', '其它')],
@@ -102,6 +107,90 @@ _CONFIGS = {
 }
 
 
+class ModeBase:
+    """ 进行 """
+
+
+class SwitchMode:
+    """ 切换不同模式的时候，需要执行的操作 """
+    def __init__(self, mainwin):
+        self.mainwin = mainwin
+
+    def init_default(self, mode):
+        pass
+
+    def init_m2302中科院题库(self, mode):
+        pass
+
+    def close_default(self, mode):
+        """ 关闭某种模式时需要执行的操作 """
+        pass
+
+    def close_m2302中科院题库(self, mode):
+        pass
+
+
+class GetDefaultLabel:
+    """ 新建框的时候，使用的默认label值
+
+    在这里可以定制不同项目生成新标注框的规则
+    这里有办法获取原图，也有办法获取标注的shape，从而可以智能推断，给出识别值的
+    """
+
+    def __init__(self, mainwin):
+        self.mainwin = mainwin
+
+    def default(self, shape=None):
+        xllabel = self.mainwin.xllabel
+        label = xllabel.cfg.get('default_label', '')
+        if xllabel.auto_rec_text and xllabel.xlapi and shape:
+            k = 'label' if 'label' in xllabel.keys else 'text'
+            text, score = xllabel.rec_text(shape.points)
+            label = xllabel.set_label_attr(label, k, text)
+            label = xllabel.set_label_attr(label, 'score', score)
+        return label
+
+    def m2302中科院题库(self, shape):
+        from pyxllib.cv.xlcvlib import xlcv
+        from pyxlpr.data.imtextline import TextlineShape
+
+        # 1 获得基本内容。如果开了识别接口，要调api。
+        xllabel = self.mainwin.xllabel
+        points = [(p.x(), p.y()) for p in shape.points]
+        d = None
+        if xllabel.auto_rec_text and xllabel.xlapi and shape:
+            # 识别指定的points区域
+
+            im = xlcv.get_sub(xllabel.mainwin.arr_image, points, warp_quad=True)
+            try:
+                d = xllabel.xlapi.priu_api('content_ocr', im, filename=xllabel.mainwin.filename)
+            except requests.exceptions.ConnectionError:
+                pass
+        if d is None:
+            d = json.loads(_CONFIGS['m2302中科院题库']['default_label'])
+
+        # 2 获得line_id
+        line_id = 1
+        shapes = xllabel.mainwin.canvas.shapes  # 最后一个框
+        if len(shapes) > 2:
+            sp = shapes[-2]  # 当前框会变成shapes[-1]，所以要取shapes[-2]才是上一次建立的框
+            line_id0 = json.loads(sp.label)['line_id']
+            if TextlineShape(points).in_the_same_line(TextlineShape([(p.x(), p.y()) for p in sp.points])):
+                line_id = line_id0
+            else:
+                line_id = line_id0 + 1
+        d['line_id'] = line_id
+
+        return json.dumps(d, ensure_ascii=False)
+
+    def __call__(self, shape=None):
+        """ 入口，根据不同的配置选择不同的模式
+
+        :param shape: 可以输入一个shape供参考
+        """
+        return getattr(self, self.mainwin.xllabel.meta_cfg['current_mode'], 'default')(shape)
+
+
 class XlLabel:
     """
     开发指南：尽量把对xllabelme的扩展，都写到这个类里，好集中统一管理
@@ -111,6 +200,7 @@ class XlLabel:
         self.mainwin = parent
 
         self.read_config()
+        self.default_shape_color_mode = 0  # 用来设置不同的高亮检查格式，会从0不断自增。然后对已有配色方案轮循获取。
 
         self.cur_img = {}  # 存储当前图片的ndarray数据。只有一条数据，k=图片路径，v=图片数据
         self.image_root = None  # 图片所在目录。有特殊功能用途，用在json和图片没有放在同一个目录的情况。
@@ -120,6 +210,7 @@ class XlLabel:
         self.xlapi = None
 
     def reset(self, mode=None):
+        """ 更新配置 """
         # 1 确定mode
         if mode:
             self.meta_cfg['current_mode'] = mode
@@ -174,23 +265,11 @@ class XlLabel:
         self.hide_attrs = [x['key'] for x in cfg['attrs'] if x['show'] == 0]
         self.cfg = cfg
 
-    def get_default_label(self, *, shape=None):
-        """ 新建shape的时候，使用的默认label值
-
-        :param shape: 可以输入一个shape供参考
-
-        这里有办法获取原图，也有办法获取标注的shape，从而可以智能推断，给出识别值的
-        """
-        label = self.cfg.get('default_label', '')
-        if self.auto_rec_text and self.xlapi and shape:
-            if self.meta_cfg['current_mode'] == 'm2302阅深题库':
-                label = self.content_ocr(shape.points)
-            else:
-                k = 'label' if 'label' in self.keys else 'text'
-                text, score = self.rec_text(shape.points)
-                label = self.set_label_attr(label, k, text)
-                label = self.set_label_attr(label, 'score', score)
-        return label
+        # 5 确定当前配色方案
+        ms = re.findall(r'(label_shape_color(?:\d+)?),', ','.join(self.cfg.keys()))
+        if ms:
+            idx = self.default_shape_color_mode % len(ms)
+            self.cfg['label_shape_color'] = self.cfg[ms[idx]]
 
     def config_label_menu(self):
         """ Label菜单栏
@@ -234,10 +313,6 @@ class XlLabel:
             return task_menu
 
         def get_auto_rec_text_action():
-            a = QAction('自动识别文本内容', label_menu)
-            a.setCheckable(True)
-            a.setChecked(self.auto_rec_text)
-
             def func(x):
                 self.auto_rec_text = x
 
@@ -248,9 +323,23 @@ class XlLabel:
                     except ConnectionError:
                         # 没有网络
                         self.xlapi = None
+                        a.setChecked(False)
+                        # 提示
+                        msg_box = QMessageBox(QMessageBox.Information, "xllabelme标注工具：连接自动识别的API失败",
+                                              "尝试连接xmutpriu.com的api失败，请检查网络问题，比如关闭梯子。\n"
+                                              '如果仍然连接不上，可能是服务器的问题，请联系"管理员"。')
+                        msg_box.setStandardButtons(QMessageBox.Ok)
+                        msg_box.exec_()
 
                 self.save_config()
 
+            a = QAction('自动识别文本内容', label_menu)
+            a.setCheckable(True)
+            if self.auto_rec_text:
+                a.setChecked(True)
+                func(True)
+            else:
+                a.setChecked(False)
             a.triggered.connect(func)
             return a
 
@@ -361,7 +450,7 @@ class XlLabel:
         :param mode:
             label_shape_color
             label_line_color
-            label_vertex_fill_color
+            label_vertex_fill_colorS
         :return:
             如果 labelattr 有对应key，action也有开，则返回拼凑的哈希字符串值
             否则返回 None
@@ -451,21 +540,39 @@ class XlLabel:
 
         return text, score
 
-    def content_ocr(self, points):
-        """ 主要给"m2302阅深题库"用的 """
+    def content_ocr(self, shape):
+        """ 主要给"m2302中科院题库"用的 """
         from pyxllib.cv.xlcvlib import xlcv
-        # 识别指定的points区域
-        if isinstance(points[0], QPointF):
-            points = [(p.x(), p.y()) for p in points]
-        im = xlcv.get_sub(self.mainwin.arr_image, points, warp_quad=True)
+        from pyxlpr.data.imtextline import TextlineShape
 
-        try:
-            d = self.xlapi.priu_api('content_ocr', im, filename=self.mainwin.filename)
-            label = json.dumps(d)
-        except requests.exceptions.ConnectionError:
-            label = _CONFIGS['m2302阅深题库']['default_label']
+        # 1 获得基本内容。如果开了识别接口，要调api。
+        points = shape.points
+        d = None
+        if self.auto_rec_text and self.xlapi and shape:
+            # 识别指定的points区域
+            if isinstance(points[0], QPointF):
+                points = [(p.x(), p.y()) for p in points]
+            im = xlcv.get_sub(self.mainwin.arr_image, points, warp_quad=True)
+            try:
+                d = self.xlapi.priu_api('content_ocr', im, filename=self.mainwin.filename)
+            except requests.exceptions.ConnectionError:
+                pass
+        if d is None:
+            d = json.loads(_CONFIGS['m2302中科院题库']['default_label'])
 
-        return label
+        # 2 获得line_id
+        line_id = 1
+        shapes = self.mainwin.canvas.shapes  # 最后一个框
+        if len(shapes) > 2:
+            sp = shapes[-2]  # 当前框会变成shapes[-1]，所以要取shapes[-2]才是上一次建立的框
+            line_id0 = json.loads(sp.label)['line_id']
+            if TextlineShape(points).in_the_same_line(TextlineShape([(p.x(), p.y()) for p in sp.points])):
+                line_id = line_id0
+            else:
+                line_id = line_id0 + 1
+        d['line_id'] = line_id
+
+        return json.dumps(d, ensure_ascii=False)
 
     def __right_click_shape(self):
         """ 扩展shape右键操作菜单功能
@@ -558,3 +665,18 @@ class XlLabel:
                             mainwin.tr("在当前鼠标点击位置，将一个shape拆成两个shape（注意，该功能会强制拆出两个矩形框）")
                             )
         return a
+
+    def change_check(self, update=True):
+        """ 设置不同的高亮格式 """
+        if update:
+            self.default_shape_color_mode += 1
+            self.reset()
+            self.mainwin.updateLabelListItems()
+
+        # 提示给出更具体的使用的范式配置
+        act = self.mainwin.changeCheckAction
+        tip = act.toolTip()
+        tip = re.sub(r'当前配置.*$', '', tip)
+        tip += '当前配置：' + ', '.join(self.cfg['label_shape_color'])
+        act.setStatusTip(tip)
+        act.setToolTip(tip)

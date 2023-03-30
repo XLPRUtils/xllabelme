@@ -18,6 +18,8 @@ from xllabelme.config import get_config
 from xllabelme.logger import logger
 from xllabelme.utils import newIcon
 
+from pyxllib.prog.pupil import dprint  # 在任意地方均可以使用dprint调试
+
 
 def default_argument_parser():
     parser = argparse.ArgumentParser()

@@ -3,6 +3,7 @@
 import functools
 import os
 import os.path as osp
+import json
 
 import numpy as np
 from qtpy import QtCore
@@ -523,6 +524,23 @@ class XlMainWindow(MainWindow):
             "Adjust brightness and contrast",
             enabled=False,
         )
+        self.changeCheckAction = action(
+            "切换检查",
+            self.changeCheck,
+            None,
+            None,
+            "切换不同的数据检查模式，有不同的高亮方案。",
+            enabled=True,
+        )
+        resortShapesAction = action(
+            "标注排序",
+            self.resortShapes,
+            None,
+            None,
+            "重新对目前标注的框进行排序。",
+            enabled=True,
+        )
+
         # Group zoom controls into a list for easier toggling.
         zoomActions = (
             self.zoomWidget,
@@ -583,6 +601,7 @@ class XlMainWindow(MainWindow):
 
         # ckz扩展的一些高级功能
         self.xllabel = XlLabel(self)
+        self.xllabel.change_check(False)  # 把更精细的tip提示更新出来
 
         # Store actions for further handling.
         self.actions = utils.struct(
@@ -767,6 +786,9 @@ class XlMainWindow(MainWindow):
             None,
             zoom,
             fitWidth,
+            None,
+            self.changeCheckAction,
+            resortShapesAction
         )
 
         self.statusBar().showMessage(str(self.tr("%s started.")) % __appname__)
@@ -1170,3 +1192,38 @@ class XlMainWindow(MainWindow):
                         self.importDirImages(d, filename=str(p), offset=0)
                         return
                 self.importDirImages(d)
+
+    def changeCheck(self):
+        """ 不能删掉这层中转，因为ui初始化的时候，还没有xllabel """
+        self.xllabel.change_check()
+
+    def resortShapes(self):
+        """ m2302中科院题库用，更新行号问题 """
+        from pyxlpr.data.imtextline import TextlineShape
+
+        # 目前只用于一个项目
+        if self.xllabel.meta_cfg['current_mode'] != 'm2302中科院题库':
+            return
+
+        # 0 数据预处理
+        def parse(sp):
+            points = [(p.x(), p.y()) for p in sp.points]
+            return [sp, json.loads(sp.label), TextlineShape(points)]
+        data = [parse(sp) for sp in self.canvas.shapes]
+
+        # 1 按照标记的line_id大小重排序
+        # 先按行排序，然后行内按重心的x轴值排序（默认文本是从左往右读）。
+        data.sort(key=lambda x: (x[1]['line_id'], x[2].centroid.x))
+
+        # 2 编号重置，改成连续的自然数
+        cur_line_id, last_tag = 0, ''
+        for item in data:
+            sp, label = item[0], item[1]
+            if label['line_id'] != last_tag:
+                cur_line_id += 1
+                last_tag = label['line_id']
+            label['line_id'] = cur_line_id
+            sp.label = json.dumps(label, ensure_ascii=False)
+
+        # 3 更新回数据
+        self.updateShapes([x[0] for x in data])

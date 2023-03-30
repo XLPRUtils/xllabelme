@@ -1333,6 +1333,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         position MUST be in global coordinates.
         """
+        from xllabelme.config.xllabellib import GetDefaultLabel
+
         items = self.uniqLabelList.selectedItems()
         text = None
         if items:
@@ -1341,10 +1343,10 @@ class MainWindow(QtWidgets.QMainWindow):
         group_id = None
         if self._config["display_label_popup"] or not text:
             previous_text = self.labelDialog.edit.text()
-            # if self.xllabel.cfg['autodict']:  # ckz
+
             if True:  # 使用我的xllabelme，会把数据全部都强制升为字典，不再考虑兼容label原版格式，这样很多扩展功能开发会简洁的多
                 shape = Shape()
-                shape.label = self.xllabel.get_default_label(shape=self.canvas.shapes[-1])
+                shape.label = GetDefaultLabel(self)(shape=self.canvas.shapes[-1])
                 shape = self.labelDialog.popUp2(shape, self)
                 if shape is not None:
                     text, flags, group_id = shape.label, shape.flags, shape.group_id
