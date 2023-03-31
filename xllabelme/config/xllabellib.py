@@ -1,9 +1,10 @@
+import functools
 import json
 import os
 import os.path as osp
-import time
 import re
 from statistics import mean
+import time
 
 import requests
 
@@ -126,10 +127,157 @@ class 原版labelme:
     def __init__(self, mainwin):
         self.mainwin = mainwin
         self.xllabel = mainwin.xllabel
+        mainwin.showMaximized()  # 窗口最大化
+        self.create()
+
+    def config_label_menu(self):
+        """ Label菜单栏 """
+        xllabel = self.xllabel
+
+        def get_task_menu():
+            # 1 关联选择任务后的回调函数
+            def func(action):
+                # 1 内置数据格式
+                action.setCheckable(True)
+                action.setChecked(True)
+                xllabel.reset(action.text())
+                # 一个时间，只能开启一个模式
+                for a in task_menu.findChildren(QAction):
+                    if a is not action:
+                        a.setChecked(False)
+
+                # 2 如果是自定义模式，弹出编辑窗
+                pass
+
+                # 3 保存配置
+                xllabel.save_config()
+
+            task_menu = QMenu('任务', label_menu)
+            task_menu.triggered.connect(func)
+
+            # 2 往Label菜单添加选项功能
+            actions = []
+            for x in _CONFIGS.keys():
+                actions.append(QAction(x, task_menu))
+            if xllabel.meta_cfg['custom_modes']:
+                actions.append(None)
+                for x in xllabel.meta_cfg['custom_modes'].keys():
+                    actions.append(QAction(x, task_menu))
+            # 激活初始mode模式的标记
+            for a in actions:
+                if a.text() == xllabel.meta_cfg['current_mode']:
+                    a.setCheckable(True)
+                    a.setChecked(True)
+            utils.addActions(task_menu, actions)
+            return task_menu
+
+        def get_auto_rec_text_action():
+            def func(x):
+                xllabel.auto_rec_text = x
+
+                if xllabel.auto_rec_text:
+                    os.environ['XlAiAccounts'] = 'eyJwcml1IjogeyJ0b2tlbiI6ICJ4bGxhYmVsbWV5XipBOXlraiJ9fQ=='
+                    try:
+                        xllabel.xlapi = XlAiClient()
+                    except ConnectionError:
+                        # 没有网络
+                        xllabel.xlapi = None
+                        a.setChecked(False)
+                        # 提示
+                        msg_box = QMessageBox(QMessageBox.Information, "xllabelme标注工具：连接自动识别的API失败",
+                                              "尝试连接xmutpriu.com的api失败，请检查网络问题，比如关闭梯子。\n"
+                                              '如果仍然连接不上，可能是服务器的问题，请联系"管理员"。')
+                        msg_box.setStandardButtons(QMessageBox.Ok)
+                        msg_box.exec_()
+
+                xllabel.save_config()
+
+            a = QAction('自动识别文本内容', label_menu)
+            a.setCheckable(True)
+            if xllabel.auto_rec_text:
+                a.setChecked(True)
+                func(True)
+            else:
+                a.setChecked(False)
+            a.triggered.connect(func)
+            return a
+
+        def get_set_image_root_action():
+            a = QAction('设置图片所在目录', label_menu)
+
+            def func():
+                xllabel.image_root = XlPath(QFileDialog.getExistingDirectory(xllabel.image_root))
+                self.mainwin.importDirImages(xllabel.mainwin.lastOpenDir)
+
+            a.triggered.connect(func)
+            return a
+
+        label_menu = self.mainwin.menus.label
+        label_menu.addMenu(get_task_menu())
+        label_menu.addSeparator()
+        label_menu.addAction(get_auto_rec_text_action())
+        label_menu.addAction(get_set_image_root_action())
+
+    def convert_to_rectangle_action(self):
+        """ 将shape形状改为四边形 """
+
+        def func():
+            item, shape = self.xllabel.get_current_select_shape()
+            if shape:
+                shape.shape_type = 'rectangle'
+                pts = [(p.x(), p.y()) for p in shape.points]
+                l, t, r, b = rect_bounds(pts)
+                shape.points = [QPointF(l, t), QPointF(r, b)]
+                mainwin.updateShape(shape, item)
+                mainwin.setDirty()
+
+        mainwin = self.mainwin
+        a = utils.newAction(mainwin,
+                            mainwin.tr("Convert to Rectangle"),
+                            func,
+                            None,  # 快捷键
+                            None,  # 图标
+                            mainwin.tr("将当前shape形状转为Rectangle矩形")  # 左下角的提示
+                            )
+        return a
+
+    def create(self):
+        mainwin = self.mainwin
+
+        # 1 增加"Label"菜单栏
+        self.config_label_menu()
+
+        # 2 编辑菜单
+        mainwin.add_point_to_edge_action = utils.qt.newCheckableAction(
+            mainwin,
+            mainwin.tr("Add Point to Edge Enable"),
+            tip=mainwin.tr("选中shape的edge时，增加分割点"),
+        )
+        mainwin.delete_selected_shape_with_warning_action = utils.qt.newCheckableAction(
+            mainwin,
+            mainwin.tr("Delete Selected Shape With Warning"),
+            checked=True,
+        )
+        mainwin.actions.editMenu = list(mainwin.actions.editMenu) + [
+            None,
+            mainwin.add_point_to_edge_action,
+            mainwin.delete_selected_shape_with_warning_action,
+        ]
+
+        # 3 右键菜单增加功能
+        mainwin.actions.menu = list(mainwin.actions.menu) + [
+            None,
+            self.convert_to_rectangle_action(),
+            self.xllabel.split_shape_action(),
+        ]
+
+        mainwin.populateModeActions()
 
     def destroy(self):
         """ 销毁项目相关配置 """
-        pass
+        self.mainwin.menus.label.clear()
+        self.mainwin.actions.editMenu = self.mainwin.actions.editMenu[:-3]
+        self.mainwin.actions.menu = self.mainwin.actions.menu[:-3]
 
     def update_shape(self, shape, label_list_item=None):
         """
@@ -213,9 +361,84 @@ class 原版labelme:
 class xllabelme(原版labelme):
     """ xllabelme扩展功能 """
 
-    def __init__(self, mainwin):
-        super().__init__(mainwin)
-        self.xllabel = mainwin.xllabel
+    def create(self):
+        super().create()
+        mainwin = self.mainwin
+
+        action = functools.partial(utils.newAction, mainwin)
+        self.changeCheckAction = action(
+            "切换检查",
+            self.change_check,
+            'F1',  # 快捷键
+            None,
+            "（快捷键：F1）切换不同的数据检查模式，有不同的高亮方案。",
+            enabled=True,
+        )
+        resortShapesAction = action(
+            "标注排序",
+            self.resortShapes,
+            None,
+            None,
+            "重新对目前标注的框进行排序。",
+            enabled=True,
+        )
+        self.change_check(update=False)  # 把更精细的tip提示更新出来
+        mainwin.actions.tool = list(mainwin.actions.tool) + [None, self.changeCheckAction, resortShapesAction]
+
+        mainwin.populateModeActions()
+
+    def change_check(self, *, update=True):
+        """ 设置不同的高亮格式 """
+        if update:
+            self.xllabel.default_shape_color_mode += 1
+            self.xllabel.reset()
+            self.mainwin.updateLabelListItems()
+
+        # 提示给出更具体的使用的范式配置
+        act = self.changeCheckAction
+        tip = act.toolTip()
+        tip = re.sub(r'当前配置.*$', '', tip)
+        tip += '当前配置：' + ', '.join(self.xllabel.cfg['label_shape_color'])
+        act.setStatusTip(tip)
+        act.setToolTip(tip)
+
+    def resortShapes(self):
+        """ m2302中科院题库用，更新行号问题 """
+        from pyxlpr.data.imtextline import TextlineShape
+
+        mainwin = self.mainwin
+        # 目前只用于一个项目
+        if self.xllabel.meta_cfg['current_mode'] != 'm2302中科院题库':
+            return
+
+        # 0 数据预处理
+        def parse(sp):
+            points = [(p.x(), p.y()) for p in sp.points]
+            return [sp, json.loads(sp.label), TextlineShape(points)]
+
+        data = [parse(sp) for sp in mainwin.canvas.shapes]
+
+        # 1 按照标记的line_id大小重排序
+        # 先按行排序，然后行内按重心的x轴值排序（默认文本是从左往右读）。
+        data.sort(key=lambda x: (x[1]['line_id'], x[2].centroid.x))
+
+        # 2 编号重置，改成连续的自然数
+        cur_line_id, last_tag = 0, ''
+        for item in data:
+            sp, label = item[0], item[1]
+            if label['line_id'] != last_tag:
+                cur_line_id += 1
+                last_tag = label['line_id']
+            label['line_id'] = cur_line_id
+            sp.label = json.dumps(label, ensure_ascii=False)
+
+        # 3 更新回数据
+        mainwin.updateShapes([x[0] for x in data])
+
+    def destroy(self):
+        self.mainwin.actions.tool = self.mainwin.actions.tool[:-3]
+        self.mainwin.populateModeActions()
+        super().destroy()
 
     def update_shape(self, shape, label_list_item=None):
         """
@@ -403,6 +626,9 @@ class m2303表格标注(原版labelme):
         bounds = poly.bounds
         width = bounds[2] - bounds[0]
         height = bounds[3] - bounds[1]
+
+        # 注意：标注过程中，是可以修改框的位置的
+        # shape.points = [QPointF(100, 100), QPointF(200, 200)]
 
         if height > width:
             return '可见竖线'
@@ -820,29 +1046,6 @@ class XlLabel:
             return None, None
         shape = item.shape()
         return item, shape
-
-    def convert_to_rectangle_action(self):
-        """ 将shape形状改为四边形 """
-
-        def func():
-            item, shape = self.get_current_select_shape()
-            if shape:
-                shape.shape_type = 'rectangle'
-                pts = [(p.x(), p.y()) for p in shape.points]
-                l, t, r, b = rect_bounds(pts)
-                shape.points = [QPointF(l, t), QPointF(r, b)]
-                mainwin.updateShape(shape, item)
-                mainwin.setDirty()
-
-        mainwin = self.mainwin
-        a = utils.newAction(mainwin,
-                            mainwin.tr("Convert to Rectangle"),
-                            func,
-                            None,  # shortcut
-                            None,  # icon
-                            mainwin.tr("将当前shape转为Rectangle矩形")  # 左下角的提示
-                            )
-        return a
 
     def split_shape_action(self):
         """ 将一个框拆成两个框

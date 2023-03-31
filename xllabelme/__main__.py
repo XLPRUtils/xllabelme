@@ -17,6 +17,7 @@ from xllabelme.xlapp import XlMainWindow
 from xllabelme.config import get_config
 from xllabelme.logger import logger
 from xllabelme.utils import newIcon
+from xllabelme.ts import zh_CN
 
 from pyxllib.prog.pupil import dprint  # 在任意地方均可以使用dprint调试
 
@@ -174,10 +175,13 @@ def main(mainwin=XlMainWindow):
             output_dir = output
 
     translator = QtCore.QTranslator()
-    translator.load(
-        QtCore.QLocale.system().name(),
-        osp.dirname(osp.abspath(__file__)) + "/translate",
-    )
+    # translator.load(
+        # QtCore.QLocale.system().name(),
+        # 'zh_CN',
+        # osp.dirname(osp.abspath(__file__)) + "/translate",
+    # )
+    # translator.load(r"C:\home\chenkunze\slns\xllabelme\xllabelme\translate\zh_CN.qm")
+    translator.loadFromData(zh_CN.encode())
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon("icon"))

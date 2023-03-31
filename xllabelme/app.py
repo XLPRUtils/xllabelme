@@ -26,7 +26,8 @@ from xllabelme.shape import Shape
 from xllabelme.widgets import BrightnessContrastDialog
 from xllabelme.widgets import Canvas
 from xllabelme.widgets import FileDialogPreview
-from xllabelme.widgets import DefaultLabelDialog
+# from xllabelme.widgets import DefaultLabelDialog
+from xllabelme.widgets import LabelDialogExt
 from xllabelme.widgets import LabelListWidget
 from xllabelme.widgets import LabelListWidgetItem
 from xllabelme.widgets import ToolBar
@@ -34,7 +35,6 @@ from xllabelme.widgets import UniqueLabelQListWidget
 from xllabelme.widgets import ZoomWidget
 
 from pyxllib.file.specialist import XlPath
-
 
 # FIXME
 # - [medium] Set max zoom value to something big enough for FitWidth/Window
@@ -95,7 +95,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._noSelectionSlot = False
 
         # Main widgets and related state.
-        self.labelDialog = DefaultLabelDialog(
+        self.labelDialog = LabelDialogExt(
             parent=self,
             labels=self._config["labels"],
             sort_labels=self._config["sort_labels"],
@@ -167,6 +167,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setAcceptDrops(True)
 
         self.canvas = self.labelList.canvas = Canvas(
+            self,
             epsilon=self._config["epsilon"],
             double_click=self._config["canvas"]["double_click"],
             num_backups=self._config["canvas"]["num_backups"],
@@ -665,6 +666,7 @@ class MainWindow(QtWidgets.QMainWindow):
             edit=self.menu(self.tr("&Edit")),
             view=self.menu(self.tr("&View")),
             help=self.menu(self.tr("&Help")),
+            label=self.menu(self.tr("&Label")),  # 标注文本相关工具
             recentFiles=QtWidgets.QMenu(self.tr("Open &Recent")),
             labelList=labelMenu,
         )
@@ -729,7 +731,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tools = self.toolbar("Tools")
         # Menu buttons on Left
         self.actions.tool = (
-            open_,
+            # open_,
             opendir,
             openNextImg,
             openPrevImg,
@@ -852,7 +854,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.createLineStripMode,
             self.actions.editMode,
         )
-        utils.addActions(self.menus.edit, actions + self.actions.editMenu)
+        utils.addActions(self.menus.edit, list(actions) + list(self.actions.editMenu))
 
     def setDirty(self):
         # Even if we autosave the file, we keep the ability to undo
