@@ -59,6 +59,9 @@ def set_default_shape_colors(cfg):
         *cfg["shape"]["hvertex_fill_color"]
     )
 
+    # Set point size from config file
+    Shape.point_size = cfg["shape"]["point_size"]
+
 
 class MainWindow(QtWidgets.QMainWindow):
     LABEL_COLORMAP = imgviz.label_colormap(value=200)
@@ -94,6 +97,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._noSelectionSlot = False
 
+        self._copied_shapes = None
         # Main widgets and related state.
         self.labelDialog = LabelDialogExt(
             parent=self,
@@ -171,6 +175,7 @@ class MainWindow(QtWidgets.QMainWindow):
             epsilon=self._config["epsilon"],
             double_click=self._config["canvas"]["double_click"],
             num_backups=self._config["canvas"]["num_backups"],
+            crosshair=self._config["canvas"]["crosshair"],
         )
         self.canvas.zoomRequest.connect(self.zoomRequest)
 
@@ -790,7 +795,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # XXX: Could be completely declarative.
         # Restore application settings.
         self.settings = QtCore.QSettings("labelme", "labelme")
-        # FIXME: QSettings.value can return None on PyQt4
         self.recentFiles = self.settings.value("recentFiles", []) or []
         size = self.settings.value("window/size", QtCore.QSize(600, 500))
         position = self.settings.value("window/position", QtCore.QPoint(0, 0))
@@ -1078,17 +1082,18 @@ class MainWindow(QtWidgets.QMainWindow):
         if shape.group_id is None:
             item.setText(
                 '{} <font color="#{:02x}{:02x}{:02x}">●</font>'.format(
-                    shape.label, *shape.fill_color.getRgb()[:3]
+                    html.escape(shape.label), *shape.fill_color.getRgb()[:3]
                 )
             )
         else:
             item.setText("{} ({})".format(shape.label, shape.group_id))
 
         self.setDirty()
-        if not self.uniqLabelList.findItemsByLabel(shape.label):
-            item = QtWidgets.QListWidgetItem()
-            item.setData(Qt.UserRole, shape.label)
+        if self.uniqLabelList.findItemByLabel(shape.label) is None:
+            item = self.uniqLabelList.createItemFromLabel(shape.label)
             self.uniqLabelList.addItem(item)
+            rgb = self._get_rgb_by_label(shape.label)
+            self.uniqLabelList.setItemLabel(item, shape.label, rgb)
 
     def fileSearchChanged(self):
         self.importDirImages(
@@ -1140,7 +1145,7 @@ class MainWindow(QtWidgets.QMainWindow):
             text = "{} ({})".format(shape.label, shape.group_id)
         label_list_item = LabelListWidgetItem(text, shape)
         self.labelList.addItem(label_list_item)
-        if not self.uniqLabelList.findItemsByLabel(shape.label):
+        if self.uniqLabelList.findItemByLabel(shape.label) is None:
             item = self.uniqLabelList.createItemFromLabel(shape.label)
             self.uniqLabelList.addItem(item)
             rgb = self._get_rgb_by_label(shape.label)
@@ -1152,7 +1157,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._update_shape_color(shape)
         label_list_item.setText(
             '{} <font color="#{:02x}{:02x}{:02x}">●</font>'.format(
-                text, *shape.fill_color.getRgb()[:3]
+                html.escape(text), *shape.fill_color.getRgb()[:3]
             )
         )
 
@@ -1167,7 +1172,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _get_rgb_by_label(self, label):
         if self._config["shape_color"] == "auto":
-            item = self.uniqLabelList.findItemsByLabel(label)[0]
+            item = self.uniqLabelList.findItemByLabel(label)
+            if item is None:
+                item = self.uniqLabelList.createItemFromLabel(label)
+                self.uniqLabelList.addItem(item)
+                rgb = self._get_rgb_by_label(label)
+                self.uniqLabelList.setItemLabel(item, label, rgb)
             label_id = self.uniqLabelList.indexFromItem(item).row() + 1
             label_id += self._config["shift_auto_shape_color"]
             return LABEL_COLORMAP[label_id % len(LABEL_COLORMAP)]
@@ -1340,7 +1350,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setScroll(orientation, value)
 
     def setScroll(self, orientation, value):
-        self.scrollBars[orientation].setValue(value)
+        self.scrollBars[orientation].setValue(int(value))
         self.scroll_values[orientation][self.filename] = value
 
     def setZoom(self, value):
@@ -1905,10 +1915,10 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.canvas.hShape.points:
             self.canvas.deleteShape(self.canvas.hShape)
             self.remLabels([self.canvas.hShape])
-            self.setDirty()
             if self.noShapes():
                 for action in self.actions.onShapesPresent:
                     action.setEnabled(False)
+        self.setDirty()
 
     def deleteSelectedShape(self):
         yes, no = QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No
@@ -1916,8 +1926,9 @@ class MainWindow(QtWidgets.QMainWindow):
             "You are about to permanently delete {} polygons, "
             "proceed anyway?"
         ).format(len(self.canvas.selectedShapes))
-        if not self.delete_selected_shape_with_warning_action.isChecked() or \
-                yes == QtWidgets.QMessageBox.warning(self, self.tr("Attention"), msg, yes | no, yes):
+        if yes == QtWidgets.QMessageBox.warning(
+            self, self.tr("Attention"), msg, yes | no, yes
+        ):
             self.remLabels(self.canvas.deleteSelected())
             self.setDirty()
             if self.noShapes():

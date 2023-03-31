@@ -16,7 +16,7 @@ from qtpy import QT_VERSION
 # 2. MINOR version when you add functionality in a backwards-compatible manner;
 # 3. PATCH version when you make backwards-compatible bug fixes.
 
-__version__ = "5.0.1"
+__version__ = "5.1.1"
 
 # 2 扩展的更灵活的labelme，兼容官方的功能，但有更强的可视化效果，能查看shape的多个属性值
 version = '2.1.27'

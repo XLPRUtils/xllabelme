@@ -250,7 +250,7 @@ class 原版labelme:
         # 2 编辑菜单
         mainwin.add_point_to_edge_action = utils.qt.newCheckableAction(
             mainwin,
-            mainwin.tr("Add Point to Edge Enable"),
+            mainwin.tr("Add Point to Edge Enable"),  # 这个功能默认是开启的，导致兼职很容易经常误触增加多边形顶点，默认应该关闭
             tip=mainwin.tr("选中shape的edge时，增加分割点"),
         )
         mainwin.delete_selected_shape_with_warning_action = utils.qt.newCheckableAction(
