@@ -11,6 +11,7 @@ import cv2  # 这个库也要打包，所以import进来
 # from qtpy import QtCore
 # from qtpy import QtWidgets  # ckz 220831周三14:39，debug模式下运行有问题
 from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtCore import QCoreApplication
 
 from xllabelme import __appname__, __version__
 from xllabelme.app import MainWindow
@@ -18,6 +19,7 @@ from xllabelme.xlapp import XlMainWindow
 from xllabelme.config import get_config
 from xllabelme.logger import logger
 from xllabelme.utils import newIcon
+import xllabelme.ts
 
 from pyxllib.prog.pupil import dprint  # 在任意地方均可以使用dprint调试
 
@@ -181,11 +183,9 @@ def main(mainwin=XlMainWindow):
             output_dir = output
 
     translator = QtCore.QTranslator()
-    translator.load(
-        args.lang,  # 写不存在的值也没影响，默认就是变成英文
-        osp.dirname(osp.abspath(__file__)) + "/translate",
-    )
-    # translator.load('translate/zh_CN.qm')  # 如果只要英文的，把这句注释掉就行
+    # 写不存在的值也没影响，默认就是变成英文
+    # translator.load(osp.dirname(osp.abspath(__file__)) + "/translate/" + 'zh_CN.qm')
+    translator.loadFromData(getattr(xllabelme.ts, args.lang))
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon("icon.png"))

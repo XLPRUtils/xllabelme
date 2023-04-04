@@ -74,7 +74,10 @@ def ts2qm():
 
 
 def qm2py():
-    """ 后记：pyinstaller可以打包文件数据，不用自己转到代码变量里，这个函数其实没用了 """
+    """ 后记：pyinstaller可以打包文件数据，不用自己转到代码变量里，这个函数其实没用了
+
+    但实测中又发现有bug，还是得先用我这个方式~
+    """
     # 读取 .qm 文件的二进制数据
     with open("zh_CN.qm", "rb") as file:
         qm_data = file.read()
@@ -135,6 +138,7 @@ def main():
     refine_txt()
     txt2ts()
     ts2qm()
+    qm2py()
 
 
 if __name__ == '__main__':

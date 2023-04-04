@@ -14,7 +14,6 @@ a = Analysis(
     datas=[ # 第一个元素是源文件或文件夹的路径，第二个元素是exe中的目标路径，一般尽量要对称一致
         ('xllabelme/config/default_config.yaml', 'xllabelme/config'),
         ('xllabelme/icons/*', 'xllabelme/icons'),
-        ('xllabelme/translate/zh_CN.qm', 'xllabelme/translate'),
     ],
     hiddenimports=['cython', 'shapely._geos'],
     hookspath=[],
