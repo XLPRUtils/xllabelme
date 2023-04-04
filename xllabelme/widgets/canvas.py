@@ -310,7 +310,7 @@ class Canvas(QtWidgets.QWidget):
                 self.hEdge = None
                 shape.highlightVertex(index, shape.MOVE_VERTEX)
                 self.overrideCursor(CURSOR_POINT)
-                self.setToolTip(self.tr("Click & drag to move point"))
+                self.setToolTip(self.mainwin.tr("Click & drag to move point"))
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
@@ -323,7 +323,7 @@ class Canvas(QtWidgets.QWidget):
                 self.prevhShape = self.hShape = shape
                 self.prevhEdge = self.hEdge = index_edge
                 self.overrideCursor(CURSOR_POINT)
-                self.setToolTip(self.tr("Click to create point"))
+                self.setToolTip(self.mainwin.tr("Click to create point"))
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break

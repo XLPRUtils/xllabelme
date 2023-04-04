@@ -16,11 +16,12 @@ from qtpy import QT_VERSION
 # 2. MINOR version when you add functionality in a backwards-compatible manner;
 # 3. PATCH version when you make backwards-compatible bug fixes.
 
-__version__ = "5.1.1"
+# 每当官方有第2位版本号更新，比如5.2、5.3时，我会尽力做个源码的同步
+# 然后我个人功能，会在第3位上自增，比如5.1.2、5.1.3
+__version__ = "5.1.2"
 
 # 2 扩展的更灵活的labelme，兼容官方的功能，但有更强的可视化效果，能查看shape的多个属性值
-version = '2.1.27'
-__appname__ = f"xllabelme v{version}"
+__appname__ = f"xllabelme v{__version__}"
 
 QT4 = QT_VERSION[0] == "4"
 QT5 = QT_VERSION[0] == "5"

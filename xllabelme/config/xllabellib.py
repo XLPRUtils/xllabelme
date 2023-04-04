@@ -5,11 +5,12 @@ import os.path as osp
 import re
 from statistics import mean
 import time
+import sys
 
 import requests
 
-from PyQt5.QtCore import QPointF
-from PyQt5.QtWidgets import QMenu, QAction, QFileDialog, QMessageBox
+from PyQt5.QtCore import QPointF, QTranslator, QLocale, QLibraryInfo
+from PyQt5.QtWidgets import QMenu, QAction, QFileDialog, QMessageBox, QActionGroup, QApplication
 from qtpy import QtGui
 from qtpy.QtCore import Qt
 
@@ -130,11 +131,11 @@ class 原版labelme:
         mainwin.showMaximized()  # 窗口最大化
         self.create()
 
-    def config_label_menu(self):
+    def config_settings_menu(self):
         """ Label菜单栏 """
-        xllabel = self.xllabel
+        mainwin, xllabel = self.mainwin, self.xllabel
 
-        def get_task_menu():
+        def create_project_menu():
             # 1 关联选择任务后的回调函数
             def func(action):
                 # 1 内置数据格式
@@ -152,13 +153,15 @@ class 原版labelme:
                 # 3 保存配置
                 xllabel.save_config()
 
-            task_menu = QMenu('任务', label_menu)
+            task_menu = QMenu(mainwin.tr('Project'), settings_menu)
             task_menu.triggered.connect(func)
 
             # 2 往Label菜单添加选项功能
             actions = []
+            # 代码里配置的默认项目
             for x in _CONFIGS.keys():
                 actions.append(QAction(x, task_menu))
+            # 配置文件里也可以额外添加项目
             if xllabel.meta_cfg['custom_modes']:
                 actions.append(None)
                 for x in xllabel.meta_cfg['custom_modes'].keys():
@@ -168,10 +171,11 @@ class 原版labelme:
                 if a.text() == xllabel.meta_cfg['current_mode']:
                     a.setCheckable(True)
                     a.setChecked(True)
+                    break
             utils.addActions(task_menu, actions)
             return task_menu
 
-        def get_auto_rec_text_action():
+        def create_auto_rec_text_action():
             def func(x):
                 xllabel.auto_rec_text = x
 
@@ -192,7 +196,7 @@ class 原版labelme:
 
                 xllabel.save_config()
 
-            a = QAction('自动识别文本内容', label_menu)
+            a = QAction(mainwin.tr('Automatically recognize'), settings_menu)
             a.setCheckable(True)
             if xllabel.auto_rec_text:
                 a.setChecked(True)
@@ -202,8 +206,8 @@ class 原版labelme:
             a.triggered.connect(func)
             return a
 
-        def get_set_image_root_action():
-            a = QAction('设置图片所在目录', label_menu)
+        def create_set_image_root_action():
+            a = QAction(mainwin.tr('Set pictures directory'), settings_menu)
 
             def func():
                 xllabel.image_root = XlPath(QFileDialog.getExistingDirectory(xllabel.image_root))
@@ -212,11 +216,26 @@ class 原版labelme:
             a.triggered.connect(func)
             return a
 
-        label_menu = self.mainwin.menus.label
-        label_menu.addMenu(get_task_menu())
-        label_menu.addSeparator()
-        label_menu.addAction(get_auto_rec_text_action())
-        label_menu.addAction(get_set_image_root_action())
+        def create_reset_config_action():
+            a = QAction(mainwin.tr('Restore default labelme configuration'), settings_menu)
+
+            def func():
+                (XlPath.home() / '.labelmerc').delete()
+                msg_box = QMessageBox(QMessageBox.Information, "恢复labelme的默认配置",
+                                      "注意，需要重启软件才能生效。")
+                msg_box.setStandardButtons(QMessageBox.Ok)
+                msg_box.exec_()
+
+            a.triggered.connect(func)
+            return a
+
+        settings_menu = self.mainwin.menus.settings
+        settings_menu.addMenu(create_project_menu())
+        settings_menu.addSeparator()
+        settings_menu.addAction(create_auto_rec_text_action())
+        settings_menu.addAction(create_set_image_root_action())
+        settings_menu.addSeparator()
+        settings_menu.addAction(create_reset_config_action())
 
     def convert_to_rectangle_action(self):
         """ 将shape形状改为四边形 """
@@ -244,10 +263,14 @@ class 原版labelme:
     def create(self):
         mainwin = self.mainwin
 
-        # 1 增加"Label"菜单栏
-        self.config_label_menu()
+        # 1 设置菜单
+        self.config_settings_menu()
 
-        # 2 编辑菜单
+        # 2 帮助菜单
+        # mainwin.actions.helpMenu = list(mainwin.actions.editMenu) + [
+        #     ]
+
+        # 3 编辑菜单
         mainwin.add_point_to_edge_action = utils.qt.newCheckableAction(
             mainwin,
             mainwin.tr("Add Point to Edge Enable"),  # 这个功能默认是开启的，导致兼职很容易经常误触增加多边形顶点，默认应该关闭
@@ -264,18 +287,21 @@ class 原版labelme:
             mainwin.delete_selected_shape_with_warning_action,
         ]
 
-        # 3 右键菜单增加功能
+        # 4 右键菜单增加功能
         mainwin.actions.menu = list(mainwin.actions.menu) + [
             None,
             self.convert_to_rectangle_action(),
             self.xllabel.split_shape_action(),
         ]
 
+        # 5 一些操作习惯
+
+
         mainwin.populateModeActions()
 
     def destroy(self):
         """ 销毁项目相关配置 """
-        self.mainwin.menus.label.clear()
+        self.mainwin.menus.settings.clear()
         self.mainwin.actions.editMenu = self.mainwin.actions.editMenu[:-3]
         self.mainwin.actions.menu = self.mainwin.actions.menu[:-3]
 
@@ -358,7 +384,7 @@ class 原版labelme:
         return self.mainwin.labelDialog.edit.text()
 
 
-class xllabelme(原版labelme):
+class 增强版xllabelme(原版labelme):
     """ xllabelme扩展功能 """
 
     def create(self):
@@ -576,13 +602,13 @@ class xllabelme(原版labelme):
         return label
 
 
-class 文字通用(xllabelme):
+class 文字通用(增强版xllabelme):
     def get_default_label(self, shape=None):
         d = {'text': '', 'category': '', 'text_kv': 'value', 'text_type': '印刷体'}
         return json.dumps(d, ensure_ascii=False)
 
 
-class m2302中科院题库(xllabelme):
+class m2302中科院题库(增强版xllabelme):
     def get_default_label(self, shape=None):
         from pyxllib.cv.xlcvlib import xlcv
         from pyxlpr.data.imtextline import TextlineShape
@@ -655,7 +681,7 @@ class XlLabel:
         self.image_root = None  # 图片所在目录。有特殊功能用途，用在json和图片没有放在同一个目录的情况。
         # 这里可以配置显示哪些可用项目标注，有时候可能会需要定制化
         self.reset()
-        # self.config_label_menu()  # 配置界面
+        # self.config_settings_menu()  # 配置界面
         self.xlapi = None
 
     def reset(self, mode=None):
@@ -874,6 +900,7 @@ class XlLabel:
             self.meta_cfg = {'current_mode': '文字通用',
                              'custom_modes': {},
                              'auto_rec_text': False,
+                             'language': 'zh_CN',
                              }
         self.auto_rec_text = self.meta_cfg.get('auto_rec_text', False)  # 新建框的时候，是否自动识别文本内容
         # auto_rec_text和xlapi两个参数不是冗余，是分别有不同含义的，最好不要去尝试精简掉！

@@ -18,7 +18,7 @@ def get_version():
     filename = "xllabelme/__init__.py"
     with open(filename, encoding='utf8') as f:
         match = re.search(
-            r"""^version\s*=\s*['"]([^'"]*)['"]""", f.read(), re.M
+            r"""^__version__\s*=\s*['"]([^'"]*)['"]""", f.read(), re.M
         )
     if not match:
         raise RuntimeError("{} doesn't contain __version__".format(filename))

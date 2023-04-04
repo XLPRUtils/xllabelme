@@ -1,0 +1,413 @@
+%s - Choose File
+%s - 选择文件
+
+%s - Choose Image or Label file
+%s - 选择图像或标签文件
+
+%s - Open Directory
+%s - 打开目录
+
+%s - Save/Load Annotations in Directory
+%s - 保存和加载批注的路径
+
+%s . Annotations will be saved/loaded in %s
+%s . 批注会被加载和保存在 %s
+
+%s started.
+%s 启动完了
+
+&Brightness Contrast
+亮度 对比度
+
+&Change Output Dir
+更改输出路径(&C)
+
+&Close
+关闭(&C)
+
+&Delete File
+删除(&D)
+
+&Edit
+编辑(&E)
+
+&Edit Label
+编辑标签(&E)
+
+&File
+文件(&F)
+
+&Fit Window
+适应窗口(&F)
+
+&Help
+帮助(&H)
+
+&Hide\nPolygons
+隐藏多边形(&H)
+
+&Keep Previous Scale
+保存之前的缩放比例
+
+&Next Image
+下一幅(&N)
+
+&Open
+打开(&O)
+
+&Open Dir
+打开目录(&O)
+
+&Original size
+原始大小(&O)
+
+&Prev Image
+上一幅(&P)
+
+&Quit
+退出(&Q)
+
+&Save
+保存(&S)
+
+&Save As
+另存为(&S)
+
+&Settings
+设置(&S)
+
+&Show\nPolygons
+显示多边形(&S)
+
+&Tutorial
+教程[&T]
+
+&View
+视图(&V)
+
+&Zoom Out
+缩小(&Z)
+
+<b>%s</b>
+<b>%s</b>
+
+<p><b>%s</b></p><p>Make sure <i>%s</i> is a valid label file.
+<p><b>%s</b></p><p>请确认<i>%s</i>是一个合法的标签文件。
+
+<p>Make sure <i>{0}</i> is a valid image file.<br/>Supported image formats: {1}</p>
+lt;p>请确认<i>{0}</i>是一个合法的图像文件。<br/>支持的格式包括: {1}</p>
+
+Add Point to Edge
+在边上加入控制点
+
+Add Point to Edge Enable
+允许在多边形边上点击添加新顶点
+
+Add point to the nearest edge
+在最近的边上加一个控制点
+
+Adjust brightness and contrast
+调整图片的亮度和对比度
+
+Attention
+注意
+
+Automatically recognize
+自动识别
+
+Brightness
+亮度
+
+Change the fill color for this specific shape
+为此多边形修改填充颜色
+
+Change the line color for this specific shape
+为此多边形修改描边颜色
+
+Change where annotations are loaded/saved
+更改载入、保存标注的路径
+
+Choose File
+选择文件
+
+Choose fill color
+选择填充颜色
+
+Choose line color
+选择描边颜色
+
+Choose polygon fill color
+选择多边形填充颜色
+
+Choose polygon line color
+选择多边形描边颜色
+
+Click & drag to move point
+点击并拖拽以移动控制点
+
+Click & drag to move shape '%s'
+点击并拖拽以移动形状'%s'
+
+Close current file
+关闭当前文件
+
+Contrast
+对比度
+
+Convert to Rectangle
+转成矩形
+
+Create a duplicate of the selected polygons
+为选中的多边形创建副本（会在原位置复制一个一样的框）
+
+Create Circle
+创建圆形
+
+Create Line
+创建直线
+
+Create LineStrip
+创建折线
+
+Create Point
+创建控制点
+
+Create Polygons
+创建多边形
+
+Create Rectangle
+创建矩形
+
+Ctrl+Wheel
+Ctrl+滚轮
+
+Decrease zoom level
+减小缩放水平
+
+Delete current label file
+删除当前标签文件
+
+Delete Polygons
+删除多边形
+
+Delete Selected Shape With Warning
+删除形状时会弹出提示框
+
+Delete the selected polygons
+删除选中的多边形
+
+Duplicate Polygons
+复制多边形
+
+Edit Polygons
+编辑多边形
+
+Error opening file
+打开文件发生错误
+
+Error reading %s
+打开文件发生错误 %s
+
+Error saving label data
+保存标签发生错误
+
+File List
+文件列表
+
+Fill Drawing Polygon
+填充所绘多边形
+
+Fill polygon while drawing
+绘制时填充多边形
+
+Fit &Width
+适应宽度(&W)
+
+Flags
+标记
+
+Hide all polygons
+隐藏多边形(&H)
+
+Image
+图像
+
+Image & Label files (%s)
+图像和标签文件(%s)
+
+Increase zoom level
+增加缩放水平
+
+Invalid label
+无效的标签
+
+Invalid label '{}' with validation type '{}'
+无效的标签'{}'，验证类型'{}'
+
+Keep Previous Annotation
+保留最后的标注
+
+Keep previous zoom scale
+陈坤泽：这个功能我目前也没弄清楚是干嘛的
+
+Label files (*%s)
+标签文件(*%s)
+
+Label List
+标签列表
+
+Loaded %s
+已加载 %s
+
+Loading %s...
+正在载入 %s...
+
+Modify the label of the selected polygon
+修改选中多边形的标签
+
+Move and edit the selected polygons
+移动、编辑选中的多边形
+
+No such file: <b>%s</b>
+文件不存在: <b>%s</b>
+
+Open &Recent
+最近打开(&R)
+
+Open Dir
+打开目录
+
+Open image or label file
+打开图像或标签文件
+
+Open next (hold Ctl+Shift to copy labels)
+打开下一幅 (按Ctl+Shift拷贝标签)
+
+Open prev (hold Ctl+Shift to copy labels)
+打开上一幅 (按Ctl+Shift拷贝标签)
+
+Polygon &Fill Color
+多边形填充颜色(&F)
+
+Polygon &Line Color
+多边形描边颜色(&L)
+
+Polygon Labels
+多边形标签
+
+Project
+项目
+
+Quit application
+退出应用
+
+Remove Selected Point
+移除选中的点
+
+Remove selected point from polygon
+移除选中的多边形的一个顶点
+
+Restore default labelme configuration
+恢复默认快捷键
+
+Save &Automatically
+自动保存(&A)
+
+Save annotations to "{}" before closing?
+关闭前保存批注到"{}"吗?
+
+Save annotations?
+保存批注吗?
+
+Save automatically
+自动保存
+
+Save image data in label file
+在json标注文件中，保存图片数据副本
+
+Save labels to a different file
+保存标签到不同的文件
+
+Save labels to file
+保存标签到文件
+
+Save With Image Data
+保存图片数据
+
+Search Filename
+按文件名检索
+
+Select label to start annotating for it. Press 'Esc' to deselect.
+选择标签类型并开始以其标注。按'Esc'取消选择。
+
+Set pictures directory
+设置图片所在目录
+
+Shape &Fill Color
+形状填充颜色(&F)
+
+Shape &Line Color
+形状描边颜色(&L)
+
+Show all polygons
+显示所有多边形
+
+Show tutorial page
+显示教程网页
+
+Split Shape
+切分形状
+
+Start drawing circles
+开始绘制圆形
+
+Start drawing lines
+开始创建直线
+
+Start drawing linestrip. Ctrl+LeftClick ends creation.
+开始绘制折线。Ctrl+单击左键结束绘制。
+
+Start drawing points
+开始绘制控制点
+
+Start drawing polygons
+开始绘制多边形
+
+Start drawing rectangles
+开始绘制矩形
+
+Toggle "keep pevious annotation" mode
+开关“保留最后的标注”模式
+
+Undo
+撤销
+
+Undo last add and edit of shape
+撤销最近一次添加和编辑
+
+Undo last drawn point
+撤销最后一次绘制的控制点
+
+Undo last point
+撤销最后的控制点
+
+You are about to permanently delete this label file, proceed anyway?
+即将永久性删除此标签文件。还要继续吗?
+
+You are about to permanently delete {} polygons, proceed anyway?
+即将永久性删除多边形{}。还要继续吗?
+
+Zoom &In
+放大(&I)
+
+Zoom follows window size
+跟随窗口大小缩放
+
+Zoom follows window width
+跟随窗口宽度缩放
+
+Zoom in or out of the image. Also accessible with {} and {} from the canvas.
+缩放图像。亦可从画布的{}和{}访问
+
+Zoom to original size
+缩放至原始大小

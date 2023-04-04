@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import functools
+import html
 import math
 import os
 import os.path as osp
@@ -10,7 +11,7 @@ import webbrowser
 import imgviz
 import natsort
 from qtpy import QtCore
-from qtpy.QtCore import Qt
+from qtpy.QtCore import Qt, QPointF
 from qtpy import QtGui
 from qtpy import QtWidgets
 
@@ -33,6 +34,7 @@ from xllabelme.widgets import LabelListWidgetItem
 from xllabelme.widgets import ToolBar
 from xllabelme.widgets import UniqueLabelQListWidget
 from xllabelme.widgets import ZoomWidget
+from xllabelme.utils.qt import newIcon
 
 from pyxllib.file.specialist import XlPath
 
@@ -206,9 +208,11 @@ class MainWindow(QtWidgets.QMainWindow):
             getattr(self, dock).setFeatures(features)
             if self._config[dock]["show"] is False:
                 getattr(self, dock).setVisible(False)
+                # getattr(self, dock).setFeatures(QtWidgets.QDockWidget.NoDockWidgetFeatures)
 
-        self.addDockWidget(Qt.RightDockWidgetArea, self.flag_dock)
-        self.addDockWidget(Qt.RightDockWidgetArea, self.label_dock)
+        # 标记、标签列表 两个窗口默认不展示
+        # self.addDockWidget(Qt.RightDockWidgetArea, self.flag_dock)
+        # self.addDockWidget(Qt.RightDockWidgetArea, self.label_dock)
         self.addDockWidget(Qt.RightDockWidgetArea, self.shape_dock)
         self.addDockWidget(Qt.RightDockWidgetArea, self.file_dock)
 
@@ -297,19 +301,19 @@ class MainWindow(QtWidgets.QMainWindow):
         saveAuto.setChecked(self._config["auto_save"])
 
         saveWithImageData = action(
-            text="Save With Image Data",
+            text=self.tr("Save With Image Data"),
             slot=self.enableSaveImageWithData,
-            tip="Save image data in label file",
+            tip=self.tr("Save image data in label file"),
             checkable=True,
             checked=False,
         )
 
         close = action(
-            "&Close",
+            self.tr("&Close"),
             self.closeFile,
             shortcuts["close"],
             "close",
-            "Close current file",
+            self.tr("Close current file"),
         )
 
         toggle_keep_prev_mode = action(
@@ -395,6 +399,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Create a duplicate of the selected polygons"),
             enabled=False,
         )
+        # 有 duplicate 其实就不需要这个重复的复制粘贴了。操作上还需要，但是菜单里不需要显示。
         copy = action(
             self.tr("Copy Polygons"),
             self.copySelectedShape,
@@ -404,7 +409,7 @@ class MainWindow(QtWidgets.QMainWindow):
             enabled=False,
         )
         paste = action(
-            self.tr("Paste Polygons"),
+            self.tr("Paste polygons"),
             self.pasteSelectedShape,
             shortcuts["paste_polygon"],
             "paste",
@@ -420,11 +425,11 @@ class MainWindow(QtWidgets.QMainWindow):
             enabled=False,
         )
         removePoint = action(
-            text="Remove Selected Point",
+            text=self.tr("Remove Selected Point"),
             slot=self.removeSelectedPoint,
             shortcut=shortcuts["remove_selected_point"],
             icon="edit",
-            tip="Remove selected point from polygon",
+            tip=self.tr("Remove selected point from polygon"),
             enabled=False,
         )
 
@@ -527,11 +532,11 @@ class MainWindow(QtWidgets.QMainWindow):
             enabled=False,
         )
         brightnessContrast = action(
-            "&Brightness Contrast",
+            self.tr("&Brightness Contrast"),
             self.brightnessContrast,
             None,
             "color",
-            "Adjust brightness and contrast",
+            self.tr("Adjust brightness and contrast"),
             enabled=False,
         )
         # Group zoom controls into a list for easier toggling.
@@ -643,8 +648,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 editMode,
                 edit,
                 duplicate,
-                copy,
-                paste,
+                # copy,
+                # paste,
                 delete,
                 undo,
                 undoLastPoint,
@@ -670,8 +675,9 @@ class MainWindow(QtWidgets.QMainWindow):
             file=self.menu(self.tr("&File")),
             edit=self.menu(self.tr("&Edit")),
             view=self.menu(self.tr("&View")),
+            settings=self.menu(self.tr('&Settings')),
+            # label=self.menu(self.tr("&Label")),  # 标注文本相关工具
             help=self.menu(self.tr("&Help")),
-            label=self.menu(self.tr("&Label")),  # 标注文本相关工具
             recentFiles=QtWidgets.QMenu(self.tr("Open &Recent")),
             labelList=labelMenu,
         )
@@ -746,8 +752,8 @@ class MainWindow(QtWidgets.QMainWindow):
             createMode,
             editMode,
             duplicate,
-            copy,
-            paste,
+            # copy,
+            # paste,
             delete,
             undo,
             brightnessContrast,
@@ -756,7 +762,7 @@ class MainWindow(QtWidgets.QMainWindow):
             fitWidth,
         )
 
-        self.statusBar().showMessage(str(self.tr("%s started.")) % __appname__)
+        self.statusBar().showMessage(self.tr("%s started.") % __appname__)
         self.statusBar().show()
 
         if output_file is not None and self._config["auto_save"]:
@@ -794,7 +800,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # XXX: Could be completely declarative.
         # Restore application settings.
-        self.settings = QtCore.QSettings("labelme", "labelme")
+        self.settings = QtCore.QSettings("labelme", "labelme")  # 这个配置好像是写到注册表中的~
         self.recentFiles = self.settings.value("recentFiles", []) or []
         size = self.settings.value("window/size", QtCore.QSize(600, 500))
         position = self.settings.value("window/position", QtCore.QPoint(0, 0))
@@ -1180,7 +1186,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.uniqLabelList.setItemLabel(item, label, rgb)
             label_id = self.uniqLabelList.indexFromItem(item).row() + 1
             label_id += self._config["shift_auto_shape_color"]
-            return LABEL_COLORMAP[label_id % len(LABEL_COLORMAP)]
+            return self.LABEL_COLORMAP[label_id % len(self.LABEL_COLORMAP)]
         elif (
                 self._config["shape_color"] == "manual"
                 and self._config["label_colors"]
@@ -1306,7 +1312,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def duplicateSelectedShape(self):
         added_shapes = self.canvas.duplicateSelectedShapes()
         self.labelList.clearSelection()
+        # dx, dy = 0, 0
         for shape in added_shapes:
+            # shape.points = [QPointF(p.x() + dx, p.y() + dy) for p in shape.points]
             self.addLabel(shape)
         self.setDirty()
 
@@ -1926,8 +1934,8 @@ class MainWindow(QtWidgets.QMainWindow):
             "You are about to permanently delete {} polygons, "
             "proceed anyway?"
         ).format(len(self.canvas.selectedShapes))
-        if yes == QtWidgets.QMessageBox.warning(
-            self, self.tr("Attention"), msg, yes | no, yes
+        if not self.delete_selected_shape_with_warning_action.isChecked() or \
+                yes == QtWidgets.QMessageBox.warning(self, self.tr("Attention"), msg, yes | no, yes
         ):
             self.remLabels(self.canvas.deleteSelected())
             self.setDirty()

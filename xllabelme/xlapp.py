@@ -196,6 +196,7 @@ class XlMainWindow(MainWindow):
         try:
             imagePath = osp.relpath(self.imagePath, osp.dirname(filename))
             # 强制不保存 imageData
+            dprint(self._config["store_data"])
             imageData = self.imageData if self._config["store_data"] else None
             if osp.dirname(filename) and not osp.exists(osp.dirname(filename)):
                 os.makedirs(osp.dirname(filename))

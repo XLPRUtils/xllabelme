@@ -13,11 +13,11 @@ import cv2  # 这个库也要打包，所以import进来
 from PyQt5 import QtWidgets, QtCore
 
 from xllabelme import __appname__, __version__
+from xllabelme.app import MainWindow
 from xllabelme.xlapp import XlMainWindow
 from xllabelme.config import get_config
 from xllabelme.logger import logger
 from xllabelme.utils import newIcon
-from xllabelme.ts import zh_CN
 
 from pyxllib.prog.pupil import dprint  # 在任意地方均可以使用dprint调试
 
@@ -61,7 +61,7 @@ def default_argument_parser():
         dest="store_data",
         action="store_false",
         help="stop storing image data to JSON file",
-        default=True,
+        default=False,
     )
     parser.add_argument(
         "--autosave",
@@ -115,6 +115,12 @@ def default_argument_parser():
         type=float,
         help="epsilon to find nearest vertex on canvas",
         default=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--lang",
+        type=str,
+        help="set language",
+        default=QtCore.QLocale.system().name(),
     )
     return parser
 
@@ -175,16 +181,14 @@ def main(mainwin=XlMainWindow):
             output_dir = output
 
     translator = QtCore.QTranslator()
-    # translator.load(
-        # QtCore.QLocale.system().name(),
-        # 'zh_CN',
-        # osp.dirname(osp.abspath(__file__)) + "/translate",
-    # )
-    # translator.load(r"C:\home\chenkunze\slns\xllabelme\xllabelme\translate\zh_CN.qm")
-    translator.loadFromData(zh_CN.encode())
+    translator.load(
+        args.lang,  # 写不存在的值也没影响，默认就是变成英文
+        osp.dirname(osp.abspath(__file__)) + "/translate",
+    )
+    # translator.load('translate/zh_CN.qm')  # 如果只要英文的，把这句注释掉就行
     app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(__appname__)
-    app.setWindowIcon(newIcon("icon"))
+    app.setWindowIcon(newIcon("icon.png"))
     app.installTranslator(translator)
     win = mainwin(
         config=config,
@@ -192,7 +196,6 @@ def main(mainwin=XlMainWindow):
         output_file=output_file,
         output_dir=output_dir,
     )
-
     if reset_config:
         logger.info("Resetting Qt config: %s" % win.settings.fileName())
         win.settings.clear()
