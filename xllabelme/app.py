@@ -74,8 +74,8 @@ class MainWindow(QtWidgets.QMainWindow):
             config=None,
             filename=None,
             output=None,
-            output_file=None,
-            output_dir=None,
+            output_file=None,  # 导出json标注的一个示例文件
+            output_dir=None,  # 导出json标注的目录
     ):
         if output is not None:
             logger.warning(
@@ -113,7 +113,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Polygon Labels 控件
         self.labelList = LabelListWidget()
-        self.lastOpenDir = None
+        self.lastOpenDir = None  # 最近打开的图片目录
 
         self.flag_dock = self.flag_widget = None
         self.flag_dock = QtWidgets.QDockWidget(self.tr("Flags"), self)
@@ -129,7 +129,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.labelList.itemChanged.connect(self.labelItemChanged)
         self.labelList.itemDropped.connect(self.labelOrderChanged)
         self.shape_dock = QtWidgets.QDockWidget(
-            self.tr("Polygon Labels"), self
+            self.tr("Polygon Labels"), self  # 多边形标签
         )
         self.shape_dock.setObjectName("Labels")
         self.shape_dock.setWidget(self.labelList)
@@ -147,7 +147,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.uniqLabelList.addItem(item)
                 rgb = self._get_rgb_by_label(label)
                 self.uniqLabelList.setItemLabel(item, label, rgb)
-        self.label_dock = QtWidgets.QDockWidget(self.tr("Label List"), self)
+        self.label_dock = QtWidgets.QDockWidget(self.tr("Label List"), self)  # 文件列表
         self.label_dock.setObjectName("Label List")
         self.label_dock.setWidget(self.uniqLabelList)
 
@@ -566,6 +566,15 @@ class MainWindow(QtWidgets.QMainWindow):
             enabled=False,
         )
 
+        clear_label = action(
+            self.tr("清空所有标注"),
+            self.clearLabel,
+            None,
+            "delete",
+            self.tr("Modify the label of the selected polygon"),
+            enabled=True,
+        )
+
         fill_drawing = action(
             self.tr("Fill Drawing Polygon"),
             self.canvas.setFillDrawing,
@@ -579,7 +588,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Lavel list context menu.
         labelMenu = QtWidgets.QMenu()
-        utils.addActions(labelMenu, (edit, delete))
+        utils.addActions(labelMenu, (edit, delete, clear_label))
         self.labelList.setContextMenuPolicy(Qt.CustomContextMenu)
         self.labelList.customContextMenuRequested.connect(
             self.popLabelListMenu
@@ -866,7 +875,13 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         utils.addActions(self.menus.edit, list(actions) + list(self.actions.editMenu))
 
-    def setDirty(self):
+    def setDirty(self, dirty=True):
+        """
+        :param dirty: 需要设置不同级别，默认True处理。这里建议使用位运算区别不同内容的备份。
+            1、True，labelme默认处理
+            2，需要保存图片数据
+        :return:
+        """
         # Even if we autosave the file, we keep the ability to undo
         self.actions.undo.setEnabled(self.canvas.isShapeRestorable)
 
@@ -877,7 +892,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 label_file = osp.join(self.output_dir, label_file_without_path)
             self.saveLabels(label_file)
             return
-        self.dirty = True
+        self.dirty = self.dirty | dirty
         self.actions.save.setEnabled(True)
         title = f'{__appname__}'
         if self.filename is not None:
@@ -1101,6 +1116,12 @@ class MainWindow(QtWidgets.QMainWindow):
             rgb = self._get_rgb_by_label(shape.label)
             self.uniqLabelList.setItemLabel(item, shape.label, rgb)
 
+    def clearLabel(self):
+        self.labelList.clear()
+        self.canvas.shapes.clear()
+        self.canvas.repaint()
+        self.setDirty()
+
     def fileSearchChanged(self):
         self.importDirImages(
             self.lastOpenDir,
@@ -1109,10 +1130,10 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
     def fileSelectionChanged(self):
-        items = self.fileListWidget.selectedItems()
+        items = self.fileListWidget.selectedItems()  # 选中的文件
         if not items:
             return
-        item = items[0]
+        item = items[0]  # 默认只能选中一个文件的
 
         if not self.mayContinue():
             return
@@ -1457,10 +1478,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.setEnabled(False)
         if filename is None:
             filename = self.settings.value("filename", "")
-        filename = str(filename)
+        # filename = str(filename)
+        filename = osp.join(self.lastOpenDir, str(filename))
         if not QtCore.QFile.exists(filename):
             self.errorMessage(
-                self.tr("Error opening file"),
+                self.tr("Error opening file"),  # 打开文件发生错误
                 self.tr("No such file: <b>%s</b>") % filename,
             )
             return False
@@ -1476,7 +1498,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 label_file
         ):
             try:
-                self.labelFile = LabelFile(label_file)
+                self.labelFile = LabelFile(label_file, filename)
             except LabelFileError as e:
                 self.errorMessage(
                     self.tr("Error opening file"),
@@ -1692,22 +1714,23 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.mayContinue():
             return
 
-        if len(self.imageList) <= 0:
+        imageList = self.imageList
+        if len(imageList) <= 0:
             return
 
-        filename = None
         if self.filename is None:
-            filename = self.imageList[0]
+            filename = imageList[0]
         else:
             try:
-                currIndex = self.imageList.index(self.filename)
-                if currIndex + offset < len(self.imageList):
-                    filename = self.imageList[currIndex + offset]
+                fn = XlPath(self.filename).relpath(self.lastOpenDir).as_posix()
+                currIndex = imageList.index(fn)
+                if currIndex + offset < len(imageList):
+                    filename = imageList[currIndex + offset]
                 else:
-                    filename = self.imageList[-1]
+                    filename = imageList[-1]
             except ValueError:  # 找不到则默认用第1个
-                filename = self.imageList[0]
-        self.filename = filename
+                filename = imageList[0]
+        self.filename = XlPath(self.lastOpenDir, filename)
 
         if self.filename and load:
             self.loadFile(self.filename)
@@ -1777,6 +1800,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def saveFile(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
+
+        if self.dirty & 2:  # 需要保存图片
+            self.canvas.pixmap.save(self.imagePath, osp.splitext(self.imagePath)[1][1:])
+
         if self.labelFile:
             # DL20180323 - overwrite when in directory
             self._saveFile(self.labelFile.filename)
@@ -1864,7 +1891,11 @@ class MainWindow(QtWidgets.QMainWindow):
             item = self.fileListWidget.currentItem()
             item.setCheckState(Qt.Unchecked)
 
+            filename = self.filename  # 这个参数不能清
             self.resetState()
+            self.filename = filename
+
+            self.openNextImg(offset=0)
 
     # Message Dialogs. #
     def hasLabels(self):
@@ -1884,6 +1915,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return osp.exists(label_file)
 
     def mayContinue(self):
+        """ 切换窗口或数据的时候，判断上一份数据是否要保存 """
         if not self.dirty:
             return True
 
@@ -1997,10 +2029,12 @@ class MainWindow(QtWidgets.QMainWindow):
                     tuple(extensions)
             ):
                 continue
-            label_file = osp.splitext(file)[0] + ".json"
+            # label_file = osp.splitext(file)[0] + ".json"
             if self.output_dir:
                 label_file_without_path = osp.basename(label_file)
                 label_file = osp.join(self.output_dir, label_file_without_path)
+            else:
+                label_file = osp.join(self.lastOpenDir, label_file)
             item = QtWidgets.QListWidgetItem(file)
             item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(
@@ -2028,35 +2062,39 @@ class MainWindow(QtWidgets.QMainWindow):
         self.filename = filename
         self.fileListWidget.clear()
 
-        if self.xllabel.image_root is None:
-            for filename in self.scanAllImages(dirpath):
-                if pattern and pattern not in filename:
-                    continue
-                label_file = osp.splitext(filename)[0] + ".json"
-                if self.output_dir:
-                    label_file_without_path = osp.basename(label_file)
-                    label_file = osp.join(self.output_dir, label_file_without_path)
-                item = QtWidgets.QListWidgetItem(filename)
-                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-                if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(
-                        label_file
-                ):
-                    item.setCheckState(Qt.Checked)
-                else:
-                    item.setCheckState(Qt.Unchecked)
-                self.fileListWidget.addItem(item)
-        else:  # ckz，我要扩展一个读取json来展示图片的功能
-            root = self.xllabel.image_root
-            for label_file in XlPath(dirpath).rglob('*.json'):
-                data = label_file.read_json()
-                if 'imagePath' in data:
-                    filename = str(root / label_file.relpath(dirpath))
-                else:
-                    continue
-                item = QtWidgets.QListWidgetItem(filename)
-                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+        image_root = self.xllabel.image_root or dirpath
+        for filename in self.scanAllImages(image_root):
+            if pattern and pattern not in filename:
+                continue
+            label_file = osp.splitext(filename)[0] + ".json"
+            # label_file = osp.join(self.lastOpenDir, osp.basename(filename) + ".json")
+            if self.output_dir:
+                label_file_without_path = osp.basename(label_file)
+                label_file = osp.join(self.output_dir, label_file_without_path)
+            else:
+                label_file = osp.join(self.lastOpenDir, label_file)
+            item = QtWidgets.QListWidgetItem(filename)
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(
+                    label_file
+            ):
                 item.setCheckState(Qt.Checked)
-                self.fileListWidget.addItem(item)
+            else:
+                item.setCheckState(Qt.Unchecked)
+            self.fileListWidget.addItem(item)
+
+        # else:  # ckz，我要扩展一个读取json来展示图片的功能
+        #     root = self.xllabel.image_root
+        #     for label_file in XlPath(dirpath).rglob('*.json'):
+        #         data = label_file.read_json()
+        #         if 'imagePath' in data:
+        #             filename = str(label_file.relpath(dirpath))
+        #         else:
+        #             continue
+        #         item = QtWidgets.QListWidgetItem(filename)
+        #         item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+        #         item.setCheckState(Qt.Checked)
+        #         self.fileListWidget.addItem(item)
 
         self.openNextImg(load=load, offset=offset)
 
@@ -2070,7 +2108,8 @@ class MainWindow(QtWidgets.QMainWindow):
         for root, dirs, files in os.walk(folderPath):
             for file in files:
                 if file.lower().endswith(tuple(extensions)):
-                    relativePath = osp.join(root, file)
-                    images.append(relativePath)
+                    # relativePath = osp.join(root, file)
+                    # images.append(relativePath)
+                    images.append((XlPath(root) / file).relpath(folderPath).as_posix())  # ckz: 只保存，显示相对路径
         images = natsort.os_sorted(images)
         return images

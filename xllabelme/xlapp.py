@@ -196,7 +196,6 @@ class XlMainWindow(MainWindow):
         try:
             imagePath = osp.relpath(self.imagePath, osp.dirname(filename))
             # 强制不保存 imageData
-            dprint(self._config["store_data"])
             imageData = self.imageData if self._config["store_data"] else None
             if osp.dirname(filename) and not osp.exists(osp.dirname(filename)):
                 os.makedirs(osp.dirname(filename))
@@ -275,8 +274,8 @@ class XlMainWindow(MainWindow):
         # files_num = len(self.fileListWidget)
         filesize = XlPath(self.imagePath).size(human_readable=True)
         shapes_num = len(self.canvas.shapes)
-        tip = f'本图信息：图片文件大小={filesize}, height×width={pixmap.height()}×{pixmap.width()}，' \
-              f'scale={canvas.scale:g}，shapes_num={shapes_num}'
+        tip = f'本图信息：图片文件大小={filesize}, 高×宽={pixmap.height()}×{pixmap.width()}，' \
+              f'形状数={shapes_num}'
         return tip
 
     def get_shape_desc(self, shape, pos):

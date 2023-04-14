@@ -34,10 +34,13 @@ class LabelFileError(Exception):
 class LabelFile(object):
     suffix = ".json"
 
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, image_file=None):
         self.shapes = []
         self.imagePath = None
         self.imageData = None
+
+        self.image_file = image_file
+
         if filename is not None:
             self.load(filename)
         self.filename = filename
@@ -110,7 +113,7 @@ class LabelFile(object):
                     imageData = utils.img_data_to_png_data(imageData)
             else:
                 # relative path from label file to relative path from cwd
-                imagePath = osp.join(osp.dirname(filename), data["imagePath"])
+                imagePath = self.image_file or osp.join(osp.dirname(filename), data["imagePath"])
                 imageData = self.load_image_file(imagePath)
             flags = data.get("flags") or {}
             imagePath = data["imagePath"]

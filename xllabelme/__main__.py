@@ -22,6 +22,8 @@ from xllabelme.utils import newIcon
 import xllabelme.ts
 
 from pyxllib.prog.pupil import dprint  # 在任意地方均可以使用dprint调试
+from pyxllib.prog.pupil import format_exception
+from pyxllib.ext.qt import show_message_box
 
 
 def default_argument_parser():
@@ -208,4 +210,7 @@ def main(mainwin=XlMainWindow):
 
 # this main block is required to generate executable by pyinstaller
 if __name__ == "__main__":
-    main(XlMainWindow)
+    try:
+        main(XlMainWindow)
+    except Exception as e:
+        show_message_box(format_exception(e), '程序跑路了，给管理员发这个截图让他来破案吧！')

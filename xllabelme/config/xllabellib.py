@@ -233,7 +233,8 @@ class 原版labelme:
         settings_menu.addMenu(create_project_menu())
         settings_menu.addSeparator()
         settings_menu.addAction(create_auto_rec_text_action())
-        settings_menu.addAction(create_set_image_root_action())
+        # 关闭该功能，发现原本就有类似的功能，是我重复造轮子了
+        # settings_menu.addAction(create_set_image_root_action())
         settings_menu.addSeparator()
         settings_menu.addAction(create_reset_config_action())
 
@@ -257,6 +258,66 @@ class 原版labelme:
                             None,  # 快捷键
                             None,  # 图标
                             mainwin.tr("将当前shape形状转为Rectangle矩形")  # 左下角的提示
+                            )
+        return a
+
+    def rotate_image_action(self):
+        """ 旋转图片 """
+
+        def flip_points(sp, h):
+            from pyxllib.algo.geo import resort_quad_points
+            pts = sp.points
+            if sp.shape_type == 'rectangle':
+                # 矩形要特殊处理，仍然确保第1个点在左上角
+                x1, y1 = pts[0].x(), pts[0].y()
+                x2, y2 = pts[1].x(), pts[1].y()
+
+                pts[0].setX(h - y2)
+                pts[0].setY(x1)
+                pts[1].setX(h - y1)
+                pts[1].setY(x2)
+            elif sp.shape_type == 'polygon' and len(pts) == 4:
+                pts = [[h - p.y(), p.x()] for p in pts]
+                pts = resort_quad_points(pts)
+                for p1, p2 in zip(sp.points, pts):
+                    p1.setX(p2[0])
+                    p1.setY(p2[1])
+            else:  # 其他形状暂不特殊处理
+                for point in sp.points:
+                    x = point.x()  # 要中转存储下，不然等下x会被新值覆盖
+                    point.setX(h - point.y())
+                    point.setY(x)
+
+        def func():
+            """ 每次执行顺时针旋转90度 """
+            from PyQt5.QtGui import QTransform
+
+            # 1 旋转shapes坐标
+            canvas = mainwin.canvas
+            h = canvas.pixmap.height()
+            shapes = canvas.shapes
+            for sp in shapes:
+                flip_points(sp, h)
+
+            # 2 旋转图片
+            mainwin.updateShapes(shapes)
+            transform = QTransform()
+            transform.rotate(90)
+            canvas.pixmap = canvas.pixmap.transformed(transform)
+
+            # 3 end
+            canvas.repaint()
+            mainwin.setDirty(3)
+
+        mainwin = self.mainwin
+        a = utils.newAction(mainwin,
+                            mainwin.tr("旋转图片"),
+                            func,
+                            None,  # 快捷键
+                            None,  # 图标
+                            mainwin.tr("将图片和当前标注的形状，顺时针旋转90度，可以多次操作调整到合适方向。"
+                                       "注意1：软件中操作并未改变原始图片，需要保存标注文件后，外部图片文件才会更新。"
+                                       "注意2：图片操作目前是撤销不了的，不过可以不保存再重新打开文件恢复初始状态。")  # 左下角的提示
                             )
         return a
 
@@ -292,18 +353,18 @@ class 原版labelme:
             None,
             self.convert_to_rectangle_action(),
             self.xllabel.split_shape_action(),
+            None,
+            self.rotate_image_action(),
         ]
 
         # 5 一些操作习惯
-
-
         mainwin.populateModeActions()
 
     def destroy(self):
         """ 销毁项目相关配置 """
         self.mainwin.menus.settings.clear()
         self.mainwin.actions.editMenu = self.mainwin.actions.editMenu[:-3]
-        self.mainwin.actions.menu = self.mainwin.actions.menu[:-3]
+        self.mainwin.actions.menu = self.mainwin.actions.menu[:-5]
 
     def update_shape(self, shape, label_list_item=None):
         """
