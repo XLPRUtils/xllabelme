@@ -8,11 +8,15 @@ import time
 import sys
 
 import requests
+import webbrowser
+
+import numpy as np
 
 from PyQt5.QtCore import QPointF, QTranslator, QLocale, QLibraryInfo
 from PyQt5.QtWidgets import QMenu, QAction, QFileDialog, QMessageBox, QActionGroup, QApplication
 from qtpy import QtGui
 from qtpy.QtCore import Qt
+from PyQt5.QtGui import QImage, QPixmap, QColor
 
 from pyxllib.file.specialist import XlPath
 from pyxllib.algo.geo import rect_bounds
@@ -20,6 +24,7 @@ from pyxllib.algo.pupil import make_index_function
 from pyxllib.prog.pupil import DictTool
 from pyxlpr.ai.clientlib import XlAiClient
 from pyxllib.algo.shapelylib import ShapelyPolygon
+# from pyxllib.xlcv import xlcv
 
 from xllabelme import utils
 from xllabelme.widgets import LabelListWidgetItem
@@ -32,7 +37,7 @@ _CONFIGS = {
         {'_attrs':
              [['line_id', 1, 'int'],
               ['content_type', 1, 'str', ('印刷体', '手写体')],
-              ["content_class", 1, "str", ("文本", "公式", "图片", "表格")],
+              ["content_class", 1, "str", ("文本", "公式", "图片", "表格", "删除")],
               ['text', 1, 'str'],
               ],
          'label_shape_color': 'content_type,content_class'.split(','),
@@ -43,6 +48,7 @@ _CONFIGS = {
                                       'text': ''}, ensure_ascii=False),
          },
     'm2303表格标注': {},
+    'm2303表格标注二阶段': {},
     # '渊亭OCR':  # 这是比较旧的一套配置字段名
     #     {'_attrs':
     #          [['content_type', 1, 'str', ('印刷体', '手写体', '印章', '其它')],
@@ -116,6 +122,36 @@ _CONFIGS = {
 }
 
 
+def q_pixmap_to_np_array(qpixmap):
+    qimage = qpixmap.toImage()
+    width, height = qimage.width(), qimage.height()
+    channel_count = qimage.pixelFormat().channelCount()
+    buffer = qimage.constBits().asarray(width * height * channel_count)
+    np_array = np.frombuffer(buffer, dtype=np.uint8).reshape((height, width, channel_count))
+    return np_array
+
+
+def np_array_to_q_pixmap(np_array):
+    if len(np_array.shape) == 2:
+        height, width = np_array.shape
+        channel_count = 1
+    else:
+        height, width, channel_count = np_array.shape
+    bytes_per_line = channel_count * width
+
+    if channel_count == 1:
+        format = QImage.Format_Grayscale8
+    elif channel_count == 3:
+        format = QImage.Format_RGB888
+    elif channel_count == 4:
+        format = QImage.Format_RGBA8888
+    else:
+        raise ValueError("Unsupported channel count: {}".format(channel_count))
+
+    qimage = QImage(np_array.data, width, height, bytes_per_line, format)
+    return QPixmap.fromImage(qimage)
+
+
 def __1_自定义项目():
     pass
 
@@ -183,7 +219,7 @@ class 原版labelme:
                     os.environ['XlAiAccounts'] = 'eyJwcml1IjogeyJ0b2tlbiI6ICJ4bGxhYmVsbWV5XipBOXlraiJ9fQ=='
                     try:
                         xllabel.xlapi = XlAiClient()
-                    except ConnectionError:
+                    except requests.exceptions.ConnectionError:
                         # 没有网络
                         xllabel.xlapi = None
                         a.setChecked(False)
@@ -229,10 +265,24 @@ class 原版labelme:
             a.triggered.connect(func)
             return a
 
+        def create_savefile_without_dialog_action():
+            a = utils.newAction(mainwin,
+                                mainwin.tr("关闭保存标注文件的弹窗"),
+                                lambda x: a.setChecked(x),
+                                None,  # 快捷键
+                                None,  # 图标
+                                mainwin.tr("无json标注文件情况下，保存时不启用dialog而是自动生成标注文件"),  # 左下角的提示
+                                checkable=True,
+                                checked=True,
+                                )
+            mainwin.savefile_without_dialog_action = a
+            return a
+
         settings_menu = self.mainwin.menus.settings
         settings_menu.addMenu(create_project_menu())
         settings_menu.addSeparator()
         settings_menu.addAction(create_auto_rec_text_action())
+        settings_menu.addAction(create_savefile_without_dialog_action())
         # 关闭该功能，发现原本就有类似的功能，是我重复造轮子了
         # settings_menu.addAction(create_set_image_root_action())
         settings_menu.addSeparator()
@@ -257,7 +307,8 @@ class 原版labelme:
                             func,
                             None,  # 快捷键
                             None,  # 图标
-                            mainwin.tr("将当前shape形状转为Rectangle矩形")  # 左下角的提示
+                            mainwin.tr("将当前shape形状转为Rectangle矩形"),  # 左下角的提示
+                            enabled=False,
                             )
         return a
 
@@ -304,6 +355,7 @@ class 原版labelme:
             transform = QTransform()
             transform.rotate(90)
             canvas.pixmap = canvas.pixmap.transformed(transform)
+            mainwin.image = canvas.pixmap.toImage()
 
             # 3 end
             canvas.repaint()
@@ -320,6 +372,27 @@ class 原版labelme:
                                        "注意2：图片操作目前是撤销不了的，不过可以不保存再重新打开文件恢复初始状态。")  # 左下角的提示
                             )
         return a
+
+    # def deskew_image_action(self):
+    #     def func():
+    #         canvas = mainwin.canvas
+    #         image = q_pixmap_to_np_array(canvas.pixmap)
+    #         image = xlcv.deskew_image(image)
+    #         canvas.pixmap = np_array_to_q_pixmap(image)
+    #         canvas.repaint()
+    #         mainwin.setDirty(2)
+    #
+    #     mainwin = self.mainwin
+    #     a = utils.newAction(mainwin,
+    #                         mainwin.tr("歪斜图片矫正"),
+    #                         func,
+    #                         None,  # 快捷键
+    #                         None,  # 图标
+    #                         mainwin.tr("歪斜比较严重的图片，可以尝试使用该功能矫正。"
+    #                                    "注意1：软件中操作并未改变原始图片，需要保存标注文件后，外部图片文件才会更新。"
+    #                                    "注意2：图片操作目前是撤销不了的，不过可以不保存再重新打开文件恢复初始状态。")  # 左下角的提示
+    #                         )
+    #     return a
 
     def create(self):
         mainwin = self.mainwin
@@ -355,10 +428,17 @@ class 原版labelme:
             self.xllabel.split_shape_action(),
             None,
             self.rotate_image_action(),
+            # self.deskew_image_action(),  # 歪斜矫正
         ]
 
         # 5 一些操作习惯
         mainwin.populateModeActions()
+
+    def shapeSelectionChanged(self, n_selected):
+        """ 选中shape时会激活的功能 """
+        menu = self.mainwin.actions.menu
+        menu[-4].setEnabled(n_selected)
+        menu[-3].setEnabled(n_selected)
 
     def destroy(self):
         """ 销毁项目相关配置 """
@@ -675,15 +755,16 @@ class m2302中科院题库(增强版xllabelme):
         from pyxlpr.data.imtextline import TextlineShape
 
         # 1 获得基本内容。如果开了识别接口，要调api。
-        xllabel = self.mainwin.xllabel
+        mainwin = self.mainwin
+        xllabel = mainwin.xllabel
         points = [(p.x(), p.y()) for p in shape.points]
         d = None
         if xllabel.auto_rec_text and xllabel.xlapi and shape:
             # 识别指定的points区域
 
-            im = xlcv.get_sub(xllabel.mainwin.arr_image, points, warp_quad=True)
+            im = xlcv.get_sub(mainwin.arr_image, points, warp_quad=True)
             try:
-                d = xllabel.xlapi.priu_api('content_ocr', im, filename=xllabel.mainwin.filename)
+                d = xllabel.xlapi.priu_api('content_ocr', im, filename=str(mainwin.filename))
             except requests.exceptions.ConnectionError:
                 pass
         if d is None:  # 设默认值
@@ -691,7 +772,7 @@ class m2302中科院题库(增强版xllabelme):
 
         # 2 获得line_id
         line_id = 1
-        shapes = xllabel.mainwin.canvas.shapes  # 最后一个框
+        shapes = mainwin.canvas.shapes  # 最后一个框
         if len(shapes) > 1:
             sp = shapes[-2]  # 当前框会变成shapes[-1]，所以要取shapes[-2]才是上一次建立的框
             line_id0 = json.loads(sp.label).get('line_id', 1)
@@ -705,6 +786,57 @@ class m2302中科院题库(增强版xllabelme):
 
 
 class m2303表格标注(原版labelme):
+    def get_default_label(self, shape=None):
+        return '表格'
+
+    def move_file(self, dst):
+        # 0 准备
+        m = self.mainwin
+        fw = self.fileListWidget
+        item = fw.currentItem()
+        t = item.text()
+
+        if t.startswith(dst + '/'):
+            # 已经是分好类的，不处理
+            return
+
+        dst_path = XlPath.init(dst, m.lastOpenDir)
+        dst_path.mkdir(exist_ok=True)
+
+        # 1 移动文件
+        p = m.get_image_path()
+        p.move(dst_path / p.name)
+        p2 = m.get_label_path()
+        p2.move(dst_path / p2.name)
+
+        # 2 更新标签
+        item.setText(dst + '/' + p.name)
+
+    def create(self):
+        super().create()
+
+        # 1 帮助文档
+        mainwin = self.mainwin
+        self.help_action = utils.newAction(mainwin,
+                                           mainwin.tr("表格标注文档"),
+                                           lambda: webbrowser.open("https://docs.qq.com/doc/DUnZJQnN1YkZMZkpx"))
+        mainwin.menus.help.addAction(self.help_action)
+
+        # 2 文件列表的右键菜单
+        fileListWidget = self.fileListWidget = mainwin.fileListWidget
+        self.menu = QMenu(self.fileListWidget)
+        self.menu.addAction('移到"无表格"', lambda: self.move_file('无表格'))
+        self.menu.addAction('移到"重复图"', lambda: self.move_file('重复图'))
+        fileListWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        fileListWidget.customContextMenuRequested.connect(lambda pos: self.menu.exec_(fileListWidget.mapToGlobal(pos)))
+
+    def destroy(self):
+        self.mainwin.menus.help.removeAction(self.help_action)
+        self.fileListWidget.customContextMenuRequested.disconnect()
+        super().destroy()
+
+
+class m2303表格标注二阶段(m2303表格标注):
     def get_default_label(self, shape=None):
         """ 这个识别可以做的更精细的，不过这个项目不一定接，现在只做一个最基础性的功能 """
         # 表格, 可见横线, 可见竖线, 不可见横线, 不可见竖线
@@ -865,7 +997,7 @@ class XlLabel:
                     os.environ['XlAiAccounts'] = 'eyJwcml1IjogeyJ0b2tlbiI6ICJ4bGxhYmVsbWV5XipBOXlraiJ9fQ=='
                     try:
                         self.xlapi = XlAiClient()
-                    except ConnectionError:
+                    except requests.exceptions.ConnectionError:
                         # 没有网络
                         self.xlapi = None
                         a.setChecked(False)
@@ -1185,7 +1317,8 @@ class XlLabel:
                             func,
                             None,  # shortcut
                             None,  # icon
-                            mainwin.tr("在当前鼠标点击位置，将一个shape拆成两个shape（注意，该功能会强制拆出两个矩形框）")
+                            mainwin.tr("在当前鼠标点击位置，将一个shape拆成两个shape（注意，该功能会强制拆出两个矩形框）"),
+                            enabled=False,
                             )
         return a
 

@@ -18,7 +18,7 @@ a = Analysis(
     hiddenimports=['cython', 'shapely._geos'],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=['pandas'],
 )
 pyz = PYZ(a.pure, a.zipped_data)
 exe = EXE(

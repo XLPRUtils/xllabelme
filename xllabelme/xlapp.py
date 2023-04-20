@@ -213,7 +213,7 @@ class XlMainWindow(MainWindow):
             # 2 fileList里可能原本没有标记json文件的，现在可以标记
             self.labelFile = lf
             items = self.fileListWidget.findItems(
-                self.imagePath, Qt.MatchExactly
+                self.get_image_path2(self.imagePath), Qt.MatchExactly
             )
             if len(items) > 0:
                 if len(items) != 1:
@@ -305,7 +305,7 @@ class XlMainWindow(MainWindow):
             d = XlPath(self.xllabel.meta_cfg['lastOpenDir'])
             if d.is_dir():
                 if 'filename' in self.xllabel.meta_cfg:
-                    p = XlPath(self.xllabel.meta_cfg['filename'])
+                    p = d / self.xllabel.meta_cfg['filename']
                     if p.is_file():
                         self.importDirImages(d, filename=str(p), offset=0)
                         return

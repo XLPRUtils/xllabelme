@@ -188,7 +188,7 @@ def main(mainwin=XlMainWindow):
     # 写不存在的值也没影响，默认就是变成英文
     # translator.load(osp.dirname(osp.abspath(__file__)) + "/translate/" + 'zh_CN.qm')
     translator.loadFromData(getattr(xllabelme.ts, args.lang))
-    app = QtWidgets.QApplication(sys.argv)
+    # app = QtWidgets.QApplication(sys.argv)
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon("icon.png"))
     app.installTranslator(translator)
@@ -208,9 +208,12 @@ def main(mainwin=XlMainWindow):
     sys.exit(app.exec_())
 
 
+def handle_exception(exc_type, exc_value, exc_traceback):
+    show_message_box(format_exception(exc_value), '程序跑路了，给管理员发这个截图让他来破案吧！')
+
+
 # this main block is required to generate executable by pyinstaller
 if __name__ == "__main__":
-    try:
-        main(XlMainWindow)
-    except Exception as e:
-        show_message_box(format_exception(e), '程序跑路了，给管理员发这个截图让他来破案吧！')
+    app = QtWidgets.QApplication(sys.argv)
+    sys.excepthook = handle_exception  # 全局异常捕获。既能获得错误，也能防止软件崩溃。
+    main(XlMainWindow)

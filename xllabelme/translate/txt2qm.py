@@ -2,7 +2,7 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import subprocess
 
-from pyxllib.xl import XlPath
+from pyxllib.file.specialist import XlPath
 
 
 def ts2txt():
@@ -95,6 +95,7 @@ def qm2py():
 
 def refine_txt():
     """ 优化txt文件内容，查重以及重排序 """
+
     def sort_groups(groups):
         sorted_groups = sorted(groups, key=lambda x: x[0].strip().lower())
         return sorted_groups

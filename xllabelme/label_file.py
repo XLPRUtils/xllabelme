@@ -15,16 +15,19 @@ from xllabelme import utils
 PIL.Image.MAX_IMAGE_PIXELS = None
 
 
-@contextlib.contextmanager
-def open(name, mode):
-    assert mode in ["r", "w"]
-    if PY2:
-        mode += "b"
-        encoding = None
-    else:
-        encoding = "utf-8"
-    yield io.open(name, mode, encoding=encoding)
-    return
+# @contextlib.contextmanager
+# def open(name, mode):
+#     assert mode in ["r", "w"]
+#     if PY2:
+#         mode += "b"
+#         encoding = None
+#     else:
+#         encoding = "utf-8"
+#     f = io.open(name, mode, encoding=encoding)
+#     try:
+#         yield f
+#     finally:
+#         f.close()
 
 
 class LabelFileError(Exception):
@@ -39,11 +42,11 @@ class LabelFile(object):
         self.imagePath = None
         self.imageData = None
 
-        self.image_file = image_file
+        self.image_file = str(image_file)
 
         if filename is not None:
             self.load(filename)
-        self.filename = filename
+        self.filename = str(filename)
 
     @staticmethod
     def load_image_file(filename):
@@ -89,7 +92,7 @@ class LabelFile(object):
             "flags",
         ]
         try:
-            with open(filename, "r") as f:
+            with open(filename, "r", encoding='utf8') as f:
                 data = json.load(f)
             version = data.get("version")
             if version is None:
@@ -201,7 +204,7 @@ class LabelFile(object):
             assert key not in data
             data[key] = value
         try:
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding='utf8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             self.filename = filename
         except Exception as e:
