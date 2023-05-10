@@ -167,6 +167,12 @@ class LabelListWidget(QtWidgets.QListView):
     def addItem(self, item):
         if not isinstance(item, LabelListWidgetItem):
             raise TypeError("item must be LabelListWidgetItem")
+
+        # 非法形状初始化的时候不显示
+        sp = item.shape()
+        if sp.shape_type == 'rectangle' and len(sp.points) == 1:
+            item.setCheckState(Qt.Unchecked)
+
         self.model().setItem(self.model().rowCount(), 0, item)
         item.setSizeHint(self.itemDelegate().sizeHint(None, None))
 

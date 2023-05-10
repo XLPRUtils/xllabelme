@@ -55,7 +55,7 @@ class XlMainWindow(MainWindow):
         self.arr_image = None  # cv2格式的图片
         self.xllabel = XlLabel(self)
         self.project = self.xllabel.open_project()
-        self.open_last_workspace()
+        self.project.open_last_workspace()
 
     def extendShapeMessage(self, shape):
         """ shape中自定义字段等信息
@@ -297,16 +297,3 @@ class XlMainWindow(MainWindow):
         显示值得用下述方式实现~~
         """
         self.statusBar().showMessage(text)
-
-    def open_last_workspace(self):
-        """ 打开上一次退出软件的工作空间状态 """
-        # 如果保存了目录和文件，打开上次工作状态
-        if 'lastOpenDir' in self.xllabel.meta_cfg:
-            d = XlPath(self.xllabel.meta_cfg['lastOpenDir'])
-            if d.is_dir():
-                if 'filename' in self.xllabel.meta_cfg:
-                    p = d / self.xllabel.meta_cfg['filename']
-                    if p.is_file():
-                        self.importDirImages(d, filename=str(p), offset=0)
-                        return
-                self.importDirImages(d)

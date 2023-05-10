@@ -25,6 +25,7 @@ from pyxllib.prog.pupil import DictTool
 from pyxlpr.ai.clientlib import XlAiClient
 from pyxllib.algo.shapelylib import ShapelyPolygon
 # from pyxllib.xlcv import xlcv
+from pyxllib.cv.rgbfmt import RgbFormatter
 
 from xllabelme import utils
 from xllabelme.widgets import LabelListWidgetItem
@@ -48,7 +49,11 @@ _CONFIGS = {
                                       'text': ''}, ensure_ascii=False),
          },
     'm2303表格标注': {},
-    'm2303表格标注二阶段': {},
+    'm2303表格标注二阶段': {
+        '_attrs': [['text', 1, 'str', ('可见横线', '可见竖线', '不可见横线', '不可见竖线')]],
+        'label_shape_color': ['text'],
+    },
+    'm2305公式符号标注': {},
     # '渊亭OCR':  # 这是比较旧的一套配置字段名
     #     {'_attrs':
     #          [['content_type', 1, 'str', ('印刷体', '手写体', '印章', '其它')],
@@ -524,88 +529,34 @@ class 原版labelme:
         """
         return self.mainwin.labelDialog.edit.text()
 
+    def open_last_workspace(self):
+        """ 打开上一次退出软件的工作空间状态 """
+        # 如果保存了目录和文件，打开上次工作状态
+        if 'lastOpenDir' in self.xllabel.meta_cfg:
+            d = XlPath(self.xllabel.meta_cfg['lastOpenDir'])
+            if d.is_dir():
+                if 'filename' in self.xllabel.meta_cfg:
+                    p = d / self.xllabel.meta_cfg['filename']
+                    if p.is_file():
+                        self.mainwin.importDirImages(d, filename=str(p), offset=0)
+                        return
+                self.mainwin.importDirImages(d)
+
+    def set_label_color(self, label, color=None):
+        """ 对普通文本值，做固定颜色映射 """
+        from xllabelme.xlapp import _COLORS
+
+        if isinstance(color, str):
+            color = RgbFormatter.from_name(color).to_tuple()
+
+        self.mainwin.labelDialog.addLabelHistory(label)  # 文本加入检索
+        # 主要为了兼容xllabelme的一个tolist操作，所以要转np
+        _COLORS[label] = np.array(color, 'uint8')  # 颜色做固定映射
+        _COLORS[str({'text': label})] = np.array(color, 'uint8')  # 被转成字典的时候，也要带颜色映射规则
+
 
 class 增强版xllabelme(原版labelme):
     """ xllabelme扩展功能 """
-
-    def create(self):
-        super().create()
-        mainwin = self.mainwin
-
-        action = functools.partial(utils.newAction, mainwin)
-        self.changeCheckAction = action(
-            "切换检查",
-            self.change_check,
-            'F1',  # 快捷键
-            None,
-            "（快捷键：F1）切换不同的数据检查模式，有不同的高亮方案。",
-            enabled=True,
-        )
-        resortShapesAction = action(
-            "标注排序",
-            self.resortShapes,
-            None,
-            None,
-            "重新对目前标注的框进行排序。",
-            enabled=True,
-        )
-        self.change_check(update=False)  # 把更精细的tip提示更新出来
-        mainwin.actions.tool = list(mainwin.actions.tool) + [None, self.changeCheckAction, resortShapesAction]
-
-        mainwin.populateModeActions()
-
-    def change_check(self, *, update=True):
-        """ 设置不同的高亮格式 """
-        if update:
-            self.xllabel.default_shape_color_mode += 1
-            self.xllabel.reset()
-            self.mainwin.updateLabelListItems()
-
-        # 提示给出更具体的使用的范式配置
-        act = self.changeCheckAction
-        tip = act.toolTip()
-        tip = re.sub(r'当前配置.*$', '', tip)
-        tip += '当前配置：' + ', '.join(self.xllabel.cfg['label_shape_color'])
-        act.setStatusTip(tip)
-        act.setToolTip(tip)
-
-    def resortShapes(self):
-        """ m2302中科院题库用，更新行号问题 """
-        from pyxlpr.data.imtextline import TextlineShape
-
-        mainwin = self.mainwin
-        # 目前只用于一个项目
-        if self.xllabel.meta_cfg['current_mode'] != 'm2302中科院题库':
-            return
-
-        # 0 数据预处理
-        def parse(sp):
-            points = [(p.x(), p.y()) for p in sp.points]
-            return [sp, json.loads(sp.label), TextlineShape(points)]
-
-        data = [parse(sp) for sp in mainwin.canvas.shapes]
-
-        # 1 按照标记的line_id大小重排序
-        # 先按行排序，然后行内按重心的x轴值排序（默认文本是从左往右读）。
-        data.sort(key=lambda x: (x[1]['line_id'], x[2].centroid.x))
-
-        # 2 编号重置，改成连续的自然数
-        cur_line_id, last_tag = 0, ''
-        for item in data:
-            sp, label = item[0], item[1]
-            if label['line_id'] != last_tag:
-                cur_line_id += 1
-                last_tag = label['line_id']
-            label['line_id'] = cur_line_id
-            sp.label = json.dumps(label, ensure_ascii=False)
-
-        # 3 更新回数据
-        mainwin.updateShapes([x[0] for x in data])
-
-    def destroy(self):
-        self.mainwin.actions.tool = self.mainwin.actions.tool[:-3]
-        self.mainwin.populateModeActions()
-        super().destroy()
 
     def update_shape(self, shape, label_list_item=None):
         """
@@ -689,6 +640,16 @@ class 增强版xllabelme(原版labelme):
 
         return label_list_item
 
+    def get_default_label(self, shape=None):
+        xllabel = self.mainwin.xllabel
+        label = xllabel.cfg.get('default_label', '')
+        if xllabel.auto_rec_text and xllabel.xlapi and shape:
+            k = 'label' if 'label' in xllabel.keys else 'text'
+            text, score = xllabel.rec_text(shape.points)
+            label = xllabel.set_label_attr(label, k, text)
+            label = xllabel.set_label_attr(label, 'score', score)
+        return label
+
     def new_shape(self):
         """ 新建标注框时的规则
         """
@@ -732,16 +693,6 @@ class 增强版xllabelme(原版labelme):
             mainwin.canvas.undoLastLine()
             mainwin.canvas.shapesBackups.pop()
 
-    def get_default_label(self, shape=None):
-        xllabel = self.mainwin.xllabel
-        label = xllabel.cfg.get('default_label', '')
-        if xllabel.auto_rec_text and xllabel.xlapi and shape:
-            k = 'label' if 'label' in xllabel.keys else 'text'
-            text, score = xllabel.rec_text(shape.points)
-            label = xllabel.set_label_attr(label, k, text)
-            label = xllabel.set_label_attr(label, 'score', score)
-        return label
-
 
 class 文字通用(增强版xllabelme):
     def get_default_label(self, shape=None):
@@ -783,6 +734,131 @@ class m2302中科院题库(增强版xllabelme):
         d['line_id'] = line_id
 
         return json.dumps(d, ensure_ascii=False)
+
+    def create(self):
+        super().create()
+        mainwin = self.mainwin
+
+        action = functools.partial(utils.newAction, mainwin)
+        self.changeCheckAction = action(
+            "切换检查",
+            self.change_check,
+            'F1',  # 快捷键
+            None,
+            "（快捷键：F1）切换不同的数据检查模式，有不同的高亮方案。",
+            enabled=True,
+        )
+        resortShapesAction = action(
+            "标注排序",
+            self.resortShapes,
+            None,
+            None,
+            "重新对目前标注的框进行排序。",
+            enabled=True,
+        )
+        self.change_check(update=False)  # 把更精细的tip提示更新出来
+
+        checkFormulaAction = action(
+            "检查全文章",
+            self.browser_paper,
+            None,
+            None,
+            "将内容按照shapes的顺序拼接成完整的文章，并检查公式渲染效率",
+            enabled=True,
+        )
+        # 检查文本行
+        # 检查小分块
+        mainwin.actions.tool = list(mainwin.actions.tool) + [
+            None,
+            self.changeCheckAction,
+            resortShapesAction,
+            checkFormulaAction,
+        ]
+
+        mainwin.populateModeActions()
+
+    def change_check(self, *, update=True):
+        """ 设置不同的高亮格式 """
+        if update:
+            self.xllabel.default_shape_color_mode += 1
+            self.xllabel.reset()
+            self.mainwin.updateLabelListItems()
+
+        # 提示给出更具体的使用的范式配置
+        act = self.changeCheckAction
+        tip = act.toolTip()
+        tip = re.sub(r'当前配置.*$', '', tip)
+        tip += '当前配置：' + ', '.join(self.xllabel.cfg['label_shape_color'])
+        act.setStatusTip(tip)
+        act.setToolTip(tip)
+
+    def resortShapes(self):
+        """ m2302中科院题库用，更新行号问题 """
+        from pyxlpr.data.imtextline import TextlineShape
+
+        mainwin = self.mainwin
+        # 目前只用于一个项目
+        if self.xllabel.meta_cfg['current_mode'] != 'm2302中科院题库':
+            return
+
+        # 0 数据预处理
+        def parse(sp):
+            points = [(p.x(), p.y()) for p in sp.points]
+            return [sp, json.loads(sp.label), TextlineShape(points)]
+
+        data = [parse(sp) for sp in mainwin.canvas.shapes]
+
+        # 1 按照标记的line_id大小重排序
+        # 先按行排序，然后行内按重心的x轴值排序（默认文本是从左往右读）。
+        data.sort(key=lambda x: (x[1]['line_id'], x[2].centroid.x))
+
+        # 2 编号重置，改成连续的自然数
+        cur_line_id, last_tag = 0, ''
+        for item in data:
+            sp, label = item[0], item[1]
+            if label['line_id'] != last_tag:
+                cur_line_id += 1
+                last_tag = label['line_id']
+            label['line_id'] = cur_line_id
+            sp.label = json.dumps(label, ensure_ascii=False)
+
+        # 3 更新回数据
+        mainwin.updateShapes([x[0] for x in data])
+
+    def browser_paper(self):
+        """ 将当前标注的text内容拼接并在公式文章渲染网页打开 """
+        # 1 拼接内容
+        shapes = self.mainwin.canvas.shapes
+        last_line_id = 1
+        paper_text = []
+        line_text = []
+        for sp in shapes:
+            label = json.loads(sp.label)
+            if label['line_id'] != last_line_id:
+                last_line_id = label['line_id']
+                paper_text.append(' '.join(line_text))
+                line_text = []
+
+            if label['content_class'] == '公式':
+                t = '$' + label['text'] + '$'
+            else:
+                t = label['text']
+            line_text.append(t)
+
+        paper_text.append(' '.join(line_text))
+        content = '\n\n'.join(paper_text)
+
+        # 2 获取渲染网页
+        title = self.mainwin.get_label_path().stem
+        r = requests.post('https://xmutpriu.com/latex/paper', json={'title': title, 'content': content})
+        p = XlPath.init(title + '.html', XlPath.tempdir())
+        p.write_text(r.text)
+        webbrowser.open(p)
+
+    def destroy(self):
+        self.mainwin.actions.tool = self.mainwin.actions.tool[:-4]
+        self.mainwin.populateModeActions()
+        super().destroy()
 
 
 class m2303表格标注(原版labelme):
@@ -836,23 +912,140 @@ class m2303表格标注(原版labelme):
         super().destroy()
 
 
-class m2303表格标注二阶段(m2303表格标注):
-    def get_default_label(self, shape=None):
-        """ 这个识别可以做的更精细的，不过这个项目不一定接，现在只做一个最基础性的功能 """
-        # 表格, 可见横线, 可见竖线, 不可见横线, 不可见竖线
+class m2303表格标注二阶段(增强版xllabelme):
 
+    def create(self):
+        super().create()
+
+        mainwin = self.mainwin
+        url = "https://www.yuque.com/xlpr/data/kvq2g82zvk5x1lkb?singleDoc#"
+        self.help_action = utils.newAction(mainwin, mainwin.tr("表格二阶段标注说明"),
+                                           lambda: webbrowser.open(url))
+        mainwin.menus.help.addAction(self.help_action)
+
+        self.set_label_color('可见横线', (0, 123, 255))  # 蓝色
+        self.set_label_color('可见竖线', (40, 167, 69))  # 绿色
+        self.set_label_color('不可见横线', (174, 223, 247))  # 不可见是可见对应的浅色
+        self.set_label_color('不可见竖线', (180, 244, 190))
+
+    def destroy(self):
+        self.mainwin.menus.help.removeAction(self.help_action)
+
+        super().destroy()
+
+    def get_default_label(self, shape=None):
+        """ 还有些细节要调，如果弹窗，应该给出默认的几种类别文本 """
+        from pyxllib.cv.xlcvlib import xlcv
+
+        # 0 注意：标注过程中，是可以修改框的位置的
+        # shape.points = [QPointF(100, 100), QPointF(200, 200)]
+
+        # 1 框的基本几何信息
         poly = ShapelyPolygon.gen([(p.x(), p.y()) for p in shape.points])
         bounds = poly.bounds
         width = bounds[2] - bounds[0]
         height = bounds[3] - bounds[1]
 
-        # 注意：标注过程中，是可以修改框的位置的
-        # shape.points = [QPointF(100, 100), QPointF(200, 200)]
+        # 2 图片信息
+        # 表格, 可见横线, 可见竖线, 不可见横线, 不可见竖线
+        mainwin = self.mainwin
+        points = [(p.x(), p.y()) for p in shape.points]
+        im = xlcv.get_sub(mainwin.arr_image, points, warp_quad=True)
+        im = xlcv.read(im, 0)  # 先转灰度图
+        im = xlcv.replace_ground_color(im, 0, 255)  # 然后转白底黑字图
+        color = im.mean()  # 计算平均颜色，越接近255，表示越是空白图。
 
-        if height > width:
-            return '可见竖线'
+        # 3 自动识别线类型
+        visible_tag = '可见' if color < 250 else '不可见'
+        line_tag = '竖线' if height > width else '横线'
+        return json.dumps({'text': visible_tag + line_tag}, ensure_ascii=False)
+
+    def new_shape(self):
+        """ 不用弹窗，直接给类别
+        """
+        mainwin = self.mainwin
+        items = mainwin.uniqLabelList.selectedItems()
+        text = None
+        if items:
+            text = items[0].data(Qt.UserRole)
+        flags = {}
+        group_id = None
+        if mainwin._config["display_label_popup"] or not text:
+            previous_text = mainwin.labelDialog.edit.text()
+
+            shape = Shape()
+            shape.label = self.get_default_label(shape=mainwin.canvas.shapes[-1])
+            # shape = mainwin.labelDialog.popUp2(shape, mainwin)
+            if shape is not None:
+                text, flags, group_id = shape.label, shape.flags, shape.group_id
+
+            if not text:
+                mainwin.labelDialog.edit.setText(previous_text)
+
+        if text and not mainwin.validateLabel(text):
+            mainwin.errorMessage(
+                mainwin.tr("Invalid label"),
+                mainwin.tr("Invalid label '{}' with validation type '{}'").format(
+                    text, mainwin._config["validate_label"]
+                ),
+            )
+            text = ""
+        if text:
+            mainwin.labelList.clearSelection()
+            shape = mainwin.canvas.setLastLabel(text, flags)
+            shape.group_id = group_id
+            mainwin.addLabel(shape)
+            mainwin.actions.editMode.setEnabled(True)
+            mainwin.actions.undoLastPoint.setEnabled(False)
+            mainwin.actions.undo.setEnabled(True)
+            mainwin.setDirty()
         else:
-            return '可见横线'
+            mainwin.canvas.undoLastLine()
+            mainwin.canvas.shapesBackups.pop()
+
+class m2305公式符号标注(原版labelme):
+    def create(self):
+        super().create()
+
+        mainwin = self.mainwin
+        url = "https://www.yuque.com/xlpr/data/sn3uglc7g6l49akv?singleDoc#"
+        self.help_action = utils.newAction(mainwin, mainwin.tr("公式符号标注说明"),
+                                           lambda: webbrowser.open(url))
+        mainwin.menus.help.addAction(self.help_action)
+
+    def destroy(self):
+        self.mainwin.menus.help.removeAction(self.help_action)
+
+        super().destroy()
+
+    def new_shape(self):
+        """ 这个项目的new_shape比较特别，并不实际添加shape，而是把无效的矩形框重新替换标注
+
+        这个功能是有一定通用性的，以后可以考虑怎么加到一般功能性框架。
+        """
+        # 1 找到第一个未显示的shape
+        mainwin = self.mainwin
+        model = mainwin.labelList.model()
+        for index in range(model.rowCount()):
+            item = model.item(index, 0)
+            if not item.checkState():
+                break
+        else:  # 如果已经全部修复，则创建不了新矩形
+            return
+
+        # 2 更新shapes位置
+        shapes = mainwin.canvas.shapes
+
+        mainwin.labelList.clearSelection()
+
+        item.shape().points = shapes[-1].points
+        item.setCheckState(Qt.Checked)
+        mainwin.canvas.shapes = shapes[:-1]
+
+        mainwin.actions.editMode.setEnabled(True)
+        mainwin.actions.undoLastPoint.setEnabled(False)
+        mainwin.actions.undo.setEnabled(True)
+        mainwin.setDirty()
 
 
 def __2_xllabel中介组件():

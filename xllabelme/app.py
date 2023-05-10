@@ -1679,30 +1679,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.loadFile(filename)
 
     def openPrevImg(self, _value=False):
-        keep_prev = self._config["keep_prev"]
-        if QtWidgets.QApplication.keyboardModifiers() == (
-                Qt.ControlModifier | Qt.ShiftModifier
-        ):
-            self._config["keep_prev"] = True
-
-        if not self.mayContinue():
-            return
-
-        if len(self.imageList) <= 0:
-            return
-
-        if self.filename is None:
-            return
-
-        fn = XlPath(self.filename).relpath(self.lastOpenDir).as_posix()
-        currIndex = self.imageList.index(fn)
-        # currIndex = self.imageList.index(self.filename)
-        if currIndex - 1 >= 0:
-            filename = self.imageList[currIndex - 1]
-            if filename:
-                self.loadFile(filename)
-
-        self._config["keep_prev"] = keep_prev
+        return self.openNextImg(_value, offset=-1)
 
     def openNextImg(self, _value=False, load=True, offset=1):
         keep_prev = self._config["keep_prev"]
@@ -1715,7 +1692,8 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         imageList = self.imageList
-        if len(imageList) <= 0:
+        num = len(imageList)
+        if num <= 0:
             return
 
         if self.filename is None:
@@ -1723,11 +1701,13 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             try:
                 fn = XlPath(self.filename).relpath(self.lastOpenDir).as_posix()
-                currIndex = imageList.index(fn)
-                if currIndex + offset < len(imageList):
-                    filename = imageList[currIndex + offset]
-                else:
-                    filename = imageList[-1]
+                lastIndex = imageList.index(fn)
+                currIndex = lastIndex + offset
+                if currIndex < 0:
+                    currIndex, load = 0, lastIndex != currIndex
+                elif currIndex >= num:
+                    currIndex, load = num - 1, lastIndex != currIndex
+                filename = imageList[currIndex]
             except ValueError:  # 找不到则默认用第1个
                 filename = imageList[0]
         self.filename = XlPath(self.lastOpenDir, filename)
