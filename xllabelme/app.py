@@ -594,6 +594,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.popLabelListMenu
         )
 
+        self.fileListMenu = QtWidgets.QMenu()
+        self.fileListWidget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.fileListWidget.customContextMenuRequested.\
+            connect(lambda pos: self.fileListMenu.exec_(self.fileListWidget.mapToGlobal(pos)))
+
         # Store actions for further handling.
         self.actions = utils.struct(
             saveAuto=saveAuto,
@@ -632,9 +637,16 @@ class MainWindow(QtWidgets.QMainWindow):
             openNextImg=openNextImg,
             openPrevImg=openPrevImg,
             fileMenuActions=(open_, opendir, save, saveAs, close, quit),
-            tool=(),
+            tool=[],
             # XXX: need to add some actions here to activate the shortcut
-            editMenu=(
+            editMenu=[
+                createMode,
+                createRectangleMode,
+                createCircleMode,
+                createLineMode,
+                createPointMode,
+                createLineStripMode,
+                editMode,
                 edit,
                 duplicate,
                 delete,
@@ -645,9 +657,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 removePoint,
                 None,
                 toggle_keep_prev_mode,
-            ),
+            ],
+            helpMenu=[
+                help,
+            ],
+            fileListMenu=[],
             # menu shown at right click，canvas里的右键菜单
-            menu=(
+            menu=[
                 createMode,
                 createRectangleMode,
                 createCircleMode,
@@ -663,7 +679,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 undo,
                 undoLastPoint,
                 removePoint,
-            ),
+            ],
             onLoadActive=(
                 close,
                 createMode,
@@ -710,10 +726,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 quit,
             ),
         )
-        utils.addActions(self.menus.help, (help,))
+        utils.addActions(self.menus.help, self.actions.helpMenu)
         utils.addActions(
             self.menus.view,
-            (
+            [
                 self.flag_dock.toggleViewAction(),
                 self.label_dock.toggleViewAction(),
                 self.shape_dock.toggleViewAction(),
@@ -733,7 +749,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 fitWidth,
                 None,
                 brightnessContrast,
-            ),
+            ],
         )
 
         self.menus.file.aboutToShow.connect(self.updateFileMenu)
@@ -742,15 +758,15 @@ class MainWindow(QtWidgets.QMainWindow):
         utils.addActions(self.canvas.menus[0], self.actions.menu)
         utils.addActions(
             self.canvas.menus[1],
-            (
+            [
                 action("复制到这里", self.copyShape),
                 action("移动到这里", self.moveShape),
-            ),
+            ],
         )
 
         self.tools = self.toolbar("Tools")
         # Menu buttons on Left
-        self.actions.tool = (
+        self.actions.tool = [
             # open_,
             opendir,
             openNextImg,
@@ -769,7 +785,7 @@ class MainWindow(QtWidgets.QMainWindow):
             None,
             zoom,
             fitWidth,
-        )
+        ]
 
         self.statusBar().showMessage(self.tr("%s started.") % __appname__)
         self.statusBar().show()
@@ -859,22 +875,16 @@ class MainWindow(QtWidgets.QMainWindow):
         return not len(self.labelList)
 
     def populateModeActions(self):
-        tool, menu = self.actions.tool, self.actions.menu
-        self.tools.clear()
-        utils.addActions(self.tools, tool)
-        self.canvas.menus[0].clear()
-        utils.addActions(self.canvas.menus[0], menu)
-        self.menus.edit.clear()
-        actions = (
-            self.actions.createMode,
-            self.actions.createRectangleMode,
-            self.actions.createCircleMode,
-            self.actions.createLineMode,
-            self.actions.createPointMode,
-            self.actions.createLineStripMode,
-            self.actions.editMode,
-        )
-        utils.addActions(self.menus.edit, list(actions) + list(self.actions.editMenu))
+        """ 刷新菜单和工具栏中的动作，我做了重构调整 """
+        def reset_menu(menu, actions):
+            menu.clear()
+            utils.addActions(menu, actions)
+
+        reset_menu(self.menus.edit, self.actions.editMenu)
+        reset_menu(self.menus.help, self.actions.helpMenu)
+        reset_menu(self.tools, self.actions.tool)
+        reset_menu(self.canvas.menus[0], self.actions.menu)
+        reset_menu(self.fileListMenu, self.actions.fileListMenu)
 
     def setDirty(self, dirty=True):
         """
@@ -1240,7 +1250,7 @@ class MainWindow(QtWidgets.QMainWindow):
             label = shape["label"]
             points = shape["points"]
             shape_type = shape["shape_type"]
-            flags = shape["flags"]
+            flags = shape["flags"] or {}
             group_id = shape["group_id"]
             other_data = shape["other_data"]
 
@@ -1372,7 +1382,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Callback functions:
 
     def newShape(self):
-        self.project.new_shape()
+        self.project.newShape()
 
     def scrollRequest(self, delta, orientation):
         units = -delta * 0.1  # natural scroll

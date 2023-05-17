@@ -29,15 +29,15 @@ def newButton(text, icon=None, slot=None):
 
 
 def newAction(
-        parent,
-        text,
-        slot=None,
-        shortcut=None,
-        icon=None,
-        tip=None,
-        checkable=False,
-        enabled=True,
-        checked=False,
+        parent,  # 父类
+        text,  # 显示文本
+        slot=None,  # 触发函数
+        shortcut=None,  # 快捷键
+        icon=None,  # 预设的图标
+        tip=None,  # 详细提示内容
+        checkable=False,  # 可勾选？
+        enabled=True,  # 组件可使用？
+        checked=False,  # 选中状态？
 ):
     """Create a new action and assign callbacks, shortcuts, etc."""
     a = QtWidgets.QAction(text, parent)

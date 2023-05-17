@@ -18,7 +18,7 @@ from qtpy import QT_VERSION
 
 # 每当官方有第2位版本号更新，比如5.2、5.3时，我会尽力做个源码的同步
 # 然后我个人功能，会在第3位上自增，比如5.1.2、5.1.3
-__version__ = "5.1.6"
+__version__ = "5.1.7"
 
 # 2 扩展的更灵活的labelme，兼容官方的功能，但有更强的可视化效果，能查看shape的多个属性值
 __appname__ = f"xllabelme v{__version__}"

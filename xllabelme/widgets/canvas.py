@@ -314,7 +314,7 @@ class Canvas(QtWidgets.QWidget):
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
-            elif index_edge is not None and shape.canAddPoint() and self.mainwin.check_add_point_to_edge:
+            elif index_edge is not None and shape.canAddPoint() and self.mainwin.add_point_to_edge_action.isChecked():
                 # 悬停在edge多边形边上
                 if self.selectedVertex():
                     self.hShape.highlightClear()
@@ -408,7 +408,7 @@ class Canvas(QtWidgets.QWidget):
                         self.drawingPolygon.emit(True)
                         self.update()
             elif self.editing():
-                if self.selectedEdge() and self.mainwin.check_add_point_to_edge:
+                if self.selectedEdge() and self.mainwin.add_point_to_edge_action.isChecked():
                     self.addPointToEdge()
                 elif (
                     self.selectedVertex()

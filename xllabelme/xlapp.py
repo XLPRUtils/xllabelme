@@ -40,6 +40,7 @@ _COLORS.update({'姓名': '黑色',
                 '其他类': '亮灰色'})
 
 _COLORS = {k: np.array(RgbFormatter.from_name(v).to_tuple(), 'uint8') for k, v in _COLORS.items()}
+_COLORS[' '] = np.array((128, 128, 128), 'uint8')  # 空值强制映射为灰色
 
 
 class XlMainWindow(MainWindow):
@@ -142,7 +143,7 @@ class XlMainWindow(MainWindow):
             self.updateShape(item.shape(), item)
 
     def updateShape(self, shape, label_list_item=None):
-        return self.project.update_shape(shape, label_list_item)
+        return self.project.updateShape(shape, label_list_item)
 
     def _get_rgb_by_label(self, label):
         """ 该函数可以强制限定某些映射颜色 """
@@ -227,11 +228,6 @@ class XlMainWindow(MainWindow):
                 self.tr("Error saving label data"), self.tr("<b>%s</b>") % e
             )
             return False
-
-    @property
-    def check_add_point_to_edge(self):
-        """ 判断添加点到多边形edge上的功能是否有打开 """
-        return self.add_point_to_edge_action.isChecked()
 
     def __get_describe(self):
         """ 各种悬停的智能提示 """
