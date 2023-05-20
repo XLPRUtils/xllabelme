@@ -1080,53 +1080,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return False
 
     def editLabel(self, item=None):
-        if item and not isinstance(item, LabelListWidgetItem):
-            raise TypeError("item must be LabelListWidgetItem type")
-
-        if not self.canvas.editing():
-            return
-        if not item:
-            item = self.currentItem()
-        if item is None:
-            return
-        shape = item.shape()
-        if shape is None:
-            return
-        text, flags, group_id = self.labelDialog.popUp(
-            text=shape.label,
-            flags=shape.flags,
-            group_id=shape.group_id,
-        )
-        if text is None:
-            return
-        if not self.validateLabel(text):
-            self.errorMessage(
-                self.tr("Invalid label"),
-                self.tr("Invalid label '{}' with validation type '{}'").format(
-                    text, self._config["validate_label"]
-                ),
-            )
-            return
-        shape.label = text
-        shape.flags = flags
-        shape.group_id = group_id
-
-        self._update_shape_color(shape)
-        if shape.group_id is None:
-            item.setText(
-                '{} <font color="#{:02x}{:02x}{:02x}">●</font>'.format(
-                    html.escape(shape.label), *shape.fill_color.getRgb()[:3]
-                )
-            )
-        else:
-            item.setText("{} ({})".format(shape.label, shape.group_id))
-
-        self.setDirty()
-        if self.uniqLabelList.findItemByLabel(shape.label) is None:
-            item = self.uniqLabelList.createItemFromLabel(shape.label)
-            self.uniqLabelList.addItem(item)
-            rgb = self._get_rgb_by_label(shape.label)
-            self.uniqLabelList.setItemLabel(item, shape.label, rgb)
+        self.project.editLabel(item)
 
     def clearLabel(self):
         self.labelList.clear()
@@ -1154,8 +1108,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if currIndex < len(self.imageList):
             filename = self.imageList[currIndex]
             if filename:
-                self.xllabel.meta_cfg['filename'] = filename
-                self.xllabel.save_config()
+                self.settings.setValue('lastFileName', str(filename))
                 self.loadFile(filename)
 
     # React to canvas signals.
@@ -1179,27 +1132,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.project.shapeSelectionChanged(n_selected)
 
     def addLabel(self, shape):
-        if shape.group_id is None:
-            text = shape.label
-        else:
-            text = "{} ({})".format(shape.label, shape.group_id)
-        label_list_item = LabelListWidgetItem(text, shape)
-        self.labelList.addItem(label_list_item)
-        if self.uniqLabelList.findItemByLabel(shape.label) is None:
-            item = self.uniqLabelList.createItemFromLabel(shape.label)
-            self.uniqLabelList.addItem(item)
-            rgb = self._get_rgb_by_label(shape.label)
-            self.uniqLabelList.setItemLabel(item, shape.label, rgb)
-        self.labelDialog.addLabelHistory(shape.label)
-        for action in self.actions.onShapesPresent:
-            action.setEnabled(True)
-
-        self._update_shape_color(shape)
-        label_list_item.setText(
-            '{} <font color="#{:02x}{:02x}{:02x}">●</font>'.format(
-                html.escape(text), *shape.fill_color.getRgb()[:3]
-            )
-        )
+        self.project.addLabel(shape)
 
     def _update_shape_color(self, shape):
         r, g, b = self._get_rgb_by_label(shape.label)
@@ -1211,25 +1144,7 @@ class MainWindow(QtWidgets.QMainWindow):
         shape.select_fill_color = QtGui.QColor(r, g, b, 155)
 
     def _get_rgb_by_label(self, label):
-        if self._config["shape_color"] == "auto":
-            item = self.uniqLabelList.findItemByLabel(label)
-            if item is None:
-                item = self.uniqLabelList.createItemFromLabel(label)
-                self.uniqLabelList.addItem(item)
-                rgb = self._get_rgb_by_label(label)
-                self.uniqLabelList.setItemLabel(item, label, rgb)
-            label_id = self.uniqLabelList.indexFromItem(item).row() + 1
-            label_id += self._config["shift_auto_shape_color"]
-            return self.LABEL_COLORMAP[label_id % len(self.LABEL_COLORMAP)]
-        elif (
-                self._config["shape_color"] == "manual"
-                and self._config["label_colors"]
-                and label in self._config["label_colors"]
-        ):
-            return self._config["label_colors"][label]
-        elif self._config["default_shape_color"]:
-            return self._config["default_shape_color"]
-        return (0, 255, 0)
+        return self.project._get_rgb_by_label(label)
 
     def remLabels(self, shapes):
         for shape in shapes:
@@ -1519,10 +1434,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.status(self.tr("Error reading %s") % label_file)
                 return False
             self.imageData = self.labelFile.imageData
-            self.imagePath = osp.join(
-                osp.dirname(label_file),
-                self.labelFile.imagePath,
-            )
+            # self.imagePath = osp.join(
+            #     osp.dirname(label_file),
+            #     self.labelFile.imagePath,
+            # )
+            self.imagePath = str(filename)
             self.otherData = self.labelFile.otherData
         else:
             self.imageData = LabelFile.load_image_file(filename)
@@ -1721,6 +1637,7 @@ class MainWindow(QtWidgets.QMainWindow):
             except ValueError:  # 找不到则默认用第1个
                 filename = imageList[0]
         self.filename = XlPath(self.lastOpenDir, filename)
+        self.settings.setValue('lastOpenDir', self.lastOpenDir)
 
         if self.filename and load:
             self.loadFile(filename)
@@ -1918,13 +1835,15 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.dirty:
             return True
 
+        # 可能有些特殊情况，文件其实已经被移走了，此时也不用再提示操作
+        if not self.filename or not XlPath.safe_init(self.filename).exists():
+            return True
+
         mb = QtWidgets.QMessageBox
-        msg = self.tr('Save annotations to "{}" before closing?').format(
-            self.filename
-        )
+        msg = self.tr('文件尚未保存，继续操作前是否保存标注：{} ？').format(self.filename)
         answer = mb.question(
             self,
-            self.tr("Save annotations?"),
+            self.tr("保存标注?"),
             msg,
             mb.Save | mb.Discard | mb.Cancel,
             mb.Save,
@@ -1988,6 +1907,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def openDirDialog(self, _value=False, dirpath=None):
         if not self.mayContinue():
             return
+        self.dirty = 0  # 确定要打开目录后，就不管原本是不是dirty，后面不再警告了
 
         defaultOpenDirPath = dirpath if dirpath else "."
         if self.lastOpenDir and osp.exists(self.lastOpenDir):

@@ -408,10 +408,11 @@ class LabelDialogExt(DefaultLabelDialog):
 
     def resetLayout(self, shape, mainwin):
         """ 增加布局项 """
+        project = mainwin.project
+
         # 1 初始化
         self.initLayout()
-        xllabel = mainwin.xllabel
-        showtext, hashtext, labelattr = xllabel.parse_shape(shape)
+        showtext, hashtext, labelattr = project.parse_shape(shape)
         if not labelattr:
             return
         layout = self.layout()
@@ -419,7 +420,7 @@ class LabelDialogExt(DefaultLabelDialog):
         # 2 处理labelattr的场景
         # 2.1 原有标准控件调整
         self.labelList.hide()
-        self.edit.setEnabled(xllabel.cfg['editable'])
+        self.edit.setEnabled(project.editable)
 
         # 2.2 封装添加每行控件的功能
         n_row = 1
@@ -429,7 +430,7 @@ class LabelDialogExt(DefaultLabelDialog):
 
             def edit_label(k, x):
                 """ 回调函数，控件修改值后，实时更新label """
-                self.edit.setText(xllabel.set_label_attr(self.edit.text(), k, x))
+                self.edit.setText(project.set_label_attr(self.edit.text(), k, x))
                 self.setWindowModified(True)
 
             if k == 'label' and v and v['items'] is None and self.labelList.count():
@@ -458,13 +459,13 @@ class LabelDialogExt(DefaultLabelDialog):
         # 2.3.1 控件分三组：明确不显示，明确要显示，未在设定清单中
         # labelattr中的所有字段都应该要展示，但要优先展示配置项里指定的，再展示其他次要、衍生字段
         keys_group = [[], [], []]
-        for x in xllabel.cfg['attrs']:
+        for x in project.attrs:
             k, s = x['key'], x['show']
             if k in labelattr:
                 keys_group[s].append(k)
         # labelattr里额外衍生的字段存在第2组
         for k in labelattr.keys():
-            if k not in xllabel.keys:
+            if k not in project.keys:
                 keys_group[2].append(k)
         # 2.3.2
         for g in [1, 2, 0]:  # 展示每组的顺序
@@ -472,7 +473,7 @@ class LabelDialogExt(DefaultLabelDialog):
                 layout.insertRow(n_row, QHLine())  # 加分割线
                 n_row += 1
                 for k in keys_group[g]:
-                    add_row(k, xllabel.get(k, None))
+                    add_row(k, project.get(k, None))
         layout.insertRow(n_row, QHLine())
 
     def popUp2(self, shape, mainwin=None):

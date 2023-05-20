@@ -209,7 +209,7 @@ def main(mainwin=XlMainWindow):
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
-    show_message_box(format_exception(exc_value), '程序跑路了，给管理员发这个截图让他来破案吧！')
+    show_message_box(format_exception(exc_value), '程序遇到了问题，麻烦将这个截图发送给管理员以便他们解决')
 
 
 # this main block is required to generate executable by pyinstaller

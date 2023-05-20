@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os.path as osp
+from pathlib import Path
 
 import PIL.Image
 
@@ -120,6 +121,7 @@ class LabelFile(object):
                 imageData = self.load_image_file(imagePath)
             flags = data.get("flags") or {}
             imagePath = data["imagePath"]
+            # imagePath = Path(self.image_file).name
             self._check_image_height_and_width(
                 base64.b64encode(imageData).decode("utf-8"),
                 data.get("imageHeight"),
