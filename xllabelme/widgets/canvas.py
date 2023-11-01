@@ -432,16 +432,21 @@ class Canvas(QtWidgets.QWidget):
             self.prevPoint = pos
 
     def mouseReleaseEvent(self, ev):
-        if ev.button() == QtCore.Qt.RightButton:
-            menu = self.menus[len(self.selectedShapesCopy) > 0]
-            self.restoreCursor()
-            if (
-                not menu.exec_(self.mapToGlobal(ev.pos()))
-                and self.selectedShapesCopy
-            ):
-                # Cancel the move by deleting the shadow copy.
-                self.selectedShapesCopy = []
-                self.repaint()
+        """ 释放鼠标左键、右键 """
+        if ev.button() == QtCore.Qt.RightButton:  # 释放鼠标右键
+            if len(self.selectedShapesCopy) == 0:
+                menu = self.menus[0]
+                self.restoreCursor()
+                if (
+                        not menu.exec_(self.mapToGlobal(ev.pos()))
+                        and self.selectedShapesCopy
+                ):
+                    # Cancel the move by deleting the shadow copy.
+                    self.selectedShapesCopy = []
+                    self.repaint()
+            else:  # 右键拖拽默认就是复制
+                self.restoreCursor()
+                self.mainwin.copyShape()
         elif ev.button() == QtCore.Qt.LeftButton:
             if self.editing():
                 if (
@@ -531,7 +536,8 @@ class Canvas(QtWidgets.QWidget):
                         self.hShapeIsSelected = True
                     self.calculateOffsets(point)
                     return
-        self.deSelectShape()
+        if not multiple_selection_mode:  # 使用Ctrl强制不会回退
+            self.deSelectShape()
 
     def calculateOffsets(self, point):
         left = self.pixmap.width() - 1
@@ -564,7 +570,11 @@ class Canvas(QtWidgets.QWidget):
 
     def boundedMoveShapes(self, shapes, pos):
         if self.outOfPixmap(pos):
-            return False  # No need to move
+            # return False  # No need to move
+            size = self.pixmap.size()
+            pos.setX(max(0, min(pos.x(), size.width() - 1)))
+            pos.setY(max(0, min(pos.y(), size.height() - 1)))
+
         o1 = pos + self.offsets[0]
         if self.outOfPixmap(o1):
             pos -= QtCore.QPoint(min(0, o1.x()), min(0, o1.y()))
@@ -727,31 +737,38 @@ class Canvas(QtWidgets.QWidget):
         # divide by scale to allow more precision when zoomed in
         return xllabelme.utils.distance(p1 - p2) < (self.epsilon / self.scale)
 
+    # def intersectionPoint(self, p1, p2):
+    #     # Cycle through each image edge in clockwise fashion,
+    #     # and find the one intersecting the current line segment.
+    #     # http://paulbourke.net/geometry/lineline2d/
+    #     size = self.pixmap.size()
+    #     points = [
+    #         (0, 0),
+    #         (size.width() - 1, 0),
+    #         (size.width() - 1, size.height() - 1),
+    #         (0, size.height() - 1),
+    #     ]
+    #     # x1, y1 should be in the pixmap, x2, y2 should be out of the pixmap
+    #     x1 = min(max(p1.x(), 0), size.width() - 1)
+    #     y1 = min(max(p1.y(), 0), size.height() - 1)
+    #     x2, y2 = p2.x(), p2.y()
+    #     d, i, (x, y) = min(self.intersectingEdges((x1, y1), (x2, y2), points))
+    #     x3, y3 = points[i]
+    #     x4, y4 = points[(i + 1) % 4]
+    #     if (x, y) == (x1, y1):
+    #         # Handle cases where previous point is on one of the edges.
+    #         if x3 == x4:
+    #             return QtCore.QPointF(x3, min(max(0, y2), max(y3, y4)))
+    #         else:  # y3 == y4
+    #             return QtCore.QPointF(min(max(0, x2), max(x3, x4)), y3)
+    #     return QtCore.QPointF(x, y)
+
     def intersectionPoint(self, p1, p2):
-        # Cycle through each image edge in clockwise fashion,
-        # and find the one intersecting the current line segment.
-        # http://paulbourke.net/geometry/lineline2d/
         size = self.pixmap.size()
-        points = [
-            (0, 0),
-            (size.width() - 1, 0),
-            (size.width() - 1, size.height() - 1),
-            (0, size.height() - 1),
-        ]
-        # x1, y1 should be in the pixmap, x2, y2 should be out of the pixmap
-        x1 = min(max(p1.x(), 0), size.width() - 1)
-        y1 = min(max(p1.y(), 0), size.height() - 1)
-        x2, y2 = p2.x(), p2.y()
-        d, i, (x, y) = min(self.intersectingEdges((x1, y1), (x2, y2), points))
-        x3, y3 = points[i]
-        x4, y4 = points[(i + 1) % 4]
-        if (x, y) == (x1, y1):
-            # Handle cases where previous point is on one of the edges.
-            if x3 == x4:
-                return QtCore.QPointF(x3, min(max(0, y2), max(y3, y4)))
-            else:  # y3 == y4
-                return QtCore.QPointF(min(max(0, x2), max(x3, x4)), y3)
-        return QtCore.QPointF(x, y)
+        # 限制x2和y2（即p2的坐标）在图片的内部
+        x2 = min(max(p2.x(), 0), size.width() - 1)
+        y2 = min(max(p2.y(), 0), size.height() - 1)
+        return QtCore.QPointF(x2, y2)
 
     def intersectingEdges(self, point1, point2, points):
         """Find intersecting edges.
@@ -922,11 +939,13 @@ class Canvas(QtWidgets.QWidget):
         self.update()
 
     def overrideCursor(self, cursor):
+        """ 改变光标形状 """
         self.restoreCursor()
         self._cursor = cursor
         QtWidgets.QApplication.setOverrideCursor(cursor)
 
     def restoreCursor(self):
+        """ 恢复光标默认形状 """
         QtWidgets.QApplication.restoreOverrideCursor()
 
     def resetState(self):

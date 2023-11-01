@@ -1,40 +1,34 @@
 # -*- coding: utf-8 -*-
 
-import functools
 import json
 import os
 import os.path as osp
 import re
 from statistics import mean
-import sys
 import time
 import html
 
 import numpy as np
-from qtpy import QtWidgets
-from qtpy.QtCore import Qt
 import requests
 import webbrowser
 
-from PyQt5.QtCore import QPointF, QTranslator, QLocale, QLibraryInfo
-from PyQt5.QtGui import QImage, QPixmap, QColor
-from PyQt5.QtWidgets import QMenu, QAction, QFileDialog, QMessageBox, QActionGroup, QApplication, QWidget
-from qtpy import QtGui
-from qtpy.QtCore import Qt
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt, QPointF
+from PyQt5.QtGui import QImage, QPixmap, QTransform
+from PyQt5.QtWidgets import QApplication, QMenu, QAction, QFileDialog, QMessageBox, QActionGroup, QWidget
 
 from pyxllib.prog.newbie import round_int
 from pyxllib.prog.pupil import DictTool
 from pyxllib.algo.geo import rect_bounds
 from pyxllib.algo.shapelylib import ShapelyPolygon
-from pyxllib.algo.pupil import make_index_function, ValuesStat
+from pyxllib.algo.pupil import make_index_function, ValuesStat, natural_sort_key
 from pyxllib.file.specialist import XlPath
 from pyxllib.cv.rgbfmt import RgbFormatter
 from pyxllib.xlcv import xlcv
-from pyxllib.ext.qt import show_message_box, WaitMessageBox
+from pyxllib.ext.qt import show_message_box, WaitDialog
 from pyxlpr.ai.clientlib import XlAiClient
 
 from xllabelme import utils
-from xllabelme import PY2
 from xllabelme.app import MainWindow
 from xllabelme.label_file import LabelFile, LabelFileError
 from xllabelme.shape import Shape
@@ -60,75 +54,68 @@ _COLORS.update({'姓名': '黑色',
 _COLORS = {k: np.array(RgbFormatter.from_name(v).to_tuple(), 'uint8') for k, v in _COLORS.items()}
 _COLORS[' '] = np.array((128, 128, 128), 'uint8')  # 空值强制映射为灰色
 
-_CONFIGS = {
-    '原版labelme': {},
-    '增强版xllabelme': {},
-    'm2302中科院题库': {},
-    'm2303表格标注': {},
-    'm2303表格标注二阶段': {},
-    'm2305公式符号标注': {},
-    # '渊亭OCR':  # 这是比较旧的一套配置字段名
-    #     {'_attrs':
-    #          [['content_type', 1, 'str', ('印刷体', '手写体', '印章', '其它')],
-    #           ['content_kv', 1, 'str', ('key', 'value')],
-    #           ["content_class", 1, "str", ("姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果", "其它类")],
-    #           ['text', 1, 'str'],
-    #           ],
-    #      'label_shape_color': 'content_class'.split(','),
-    #      'label_vertex_fill_color': 'content_kv'.split(','),
-    #      'default_label': json.dumps({'content_type': '印刷体', 'content_kv': 'value',
-    #                                   'content_class': '其它类', 'text': ''}, ensure_ascii=False),
-    #      },
-    # '核酸检测':  # 这是比较旧的一套配置字段名
-    #     {'_attrs':
-    #          [['text', 1, 'str'],
-    #           ["content_class", 1, "str", ("其它类", "姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果")],
-    #           ['content_kv', 1, 'str', ('key', 'value')],
-    #           ],
-    #      'label_shape_color': 'content_class'.split(','),
-    #      'default_label': json.dumps({'text': '', 'content_class': '其它类', 'content_kv': 'value'}, ensure_ascii=False),
-    #      },
-    # '三码合一入学判定':
-    #     {'_attrs':
-    #          [['text', 1, 'str'],
-    #           ["category", 1, "str", ("姓名", "身份证", "联系方式", "采样时间", "检测时间", "核酸结果",
-    #                                   "14天经过或途经", "健康码颜色", "其他类")],
-    #           ['text_kv', 1, 'str', ('key', 'value')],
-    #           ],
-    #      'label_shape_color': 'category'.split(','),
-    #      'default_label': json.dumps({'text': '', 'category': '其他类', 'text_kv': 'value'}, ensure_ascii=False),
-    #      },
-    '文字通用': {},
-    # 'XlCoco': {
-    #     '_attrs':
-    #         [['id', 1, 'int'],
-    #          ['text', 1, 'str'],  # 这个本来叫label，但为了规范，统一成text
-    #          ['category_id', 1, 'int'],
-    #          ['content_type', 1, 'str', ('印刷体', '手写体', '印章', '身份证', '表格', '其它证件类', '其它')],
-    #          ['content_class', 1, 'str'],
-    #          ['content_kv', 1, 'str', ('key', 'value')],
-    #          ['bbox', 0],
-    #          ['area', 0],
-    #          ['image_id', 0],
-    #          ['segmentation', 0],
-    #          ['iscrowd', 0],
-    #          ['points', 0, 'list'],
-    #          ['shape_color', 0, 'list'],
-    #          ['line_color', 0, 'list'],
-    #          ['vertex_color', 0, 'list'],
-    #          ],
-    #     'label_shape_color': 'category_id,content_class'.split(','),
-    #     'label_line_color': 'gt_category_id,gt_category_name'.split(','),
-    #     'label_vertex_fill_color': 'dt_category_id,dt_category_name,content_kv'.split(','),
-    # },
-    # 'Sroie2019+':
-    #     {'_attrs':
-    #          [['text', 1, 'str'],  # 原来叫label的，改成text
-    #           ['sroie_class', 1, 'str', ('other', 'company', 'address', 'date', 'total')],
-    #           ['sroie_kv', 1, 'str', ('other', 'key', 'value')],
-    #           ]
-    #      },
-}
+
+# 一些旧的项目配置，大概率用不上了，但留着以防万一
+# '渊亭OCR':  # 这是比较旧的一套配置字段名
+#     {'_attrs':
+#          [['content_type', 1, 'str', ('印刷体', '手写体', '印章', '其它')],
+#           ['content_kv', 1, 'str', ('key', 'value')],
+#           ["content_class", 1, "str", ("姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果", "其它类")],
+#           ['text', 1, 'str'],
+#           ],
+#      'label_shape_color': 'content_class'.split(','),
+#      'label_vertex_fill_color': 'content_kv'.split(','),
+#      'default_label': json.dumps({'content_type': '印刷体', 'content_kv': 'value',
+#                                   'content_class': '其它类', 'text': ''}, ensure_ascii=False),
+#      },
+# '核酸检测':  # 这是比较旧的一套配置字段名
+#     {'_attrs':
+#          [['text', 1, 'str'],
+#           ["content_class", 1, "str", ("其它类", "姓名", "身份证号", "联系方式", "采样时间", "检测时间", "核酸结果")],
+#           ['content_kv', 1, 'str', ('key', 'value')],
+#           ],
+#      'label_shape_color': 'content_class'.split(','),
+#      'default_label': json.dumps({'text': '', 'content_class': '其它类', 'content_kv': 'value'}, ensure_ascii=False),
+#      },
+# '三码合一入学判定':
+#     {'_attrs':
+#          [['text', 1, 'str'],
+#           ["category", 1, "str", ("姓名", "身份证", "联系方式", "采样时间", "检测时间", "核酸结果",
+#                                   "14天经过或途经", "健康码颜色", "其他类")],
+#           ['text_kv', 1, 'str', ('key', 'value')],
+#           ],
+#      'label_shape_color': 'category'.split(','),
+#      'default_label': json.dumps({'text': '', 'category': '其他类', 'text_kv': 'value'}, ensure_ascii=False),
+#      },
+# 'XlCoco': {
+#     '_attrs':
+#         [['id', 1, 'int'],
+#          ['text', 1, 'str'],  # 这个本来叫label，但为了规范，统一成text
+#          ['category_id', 1, 'int'],
+#          ['content_type', 1, 'str', ('印刷体', '手写体', '印章', '身份证', '表格', '其它证件类', '其它')],
+#          ['content_class', 1, 'str'],
+#          ['content_kv', 1, 'str', ('key', 'value')],
+#          ['bbox', 0],
+#          ['area', 0],
+#          ['image_id', 0],
+#          ['segmentation', 0],
+#          ['iscrowd', 0],
+#          ['points', 0, 'list'],
+#          ['shape_color', 0, 'list'],
+#          ['line_color', 0, 'list'],
+#          ['vertex_color', 0, 'list'],
+#          ],
+#     'label_shape_color': 'category_id,content_class'.split(','),
+#     'label_line_color': 'gt_category_id,gt_category_name'.split(','),
+#     'label_vertex_fill_color': 'dt_category_id,dt_category_name,content_kv'.split(','),
+# },
+# 'Sroie2019+':
+#     {'_attrs':
+#          [['text', 1, 'str'],  # 原来叫label的，改成text
+#           ['sroie_class', 1, 'str', ('other', 'company', 'address', 'date', 'total')],
+#           ['sroie_kv', 1, 'str', ('other', 'key', 'value')],
+#           ]
+#      },
 
 
 def q_pixmap_to_np_array(qpixmap):
@@ -184,7 +171,6 @@ class XlMainWindow(MainWindow):
 
         self.config_settings_menu()
         self.reset_project()
-        self.open_last_workspace()
 
     def __1_基础功能(self):
         """ low-level级别的新增api """
@@ -336,9 +322,9 @@ class XlMainWindow(MainWindow):
                         self.xlapi = None
                         a.setChecked(False)
                         # 提示
-                        show_message_box("xllabelme标注工具：连接自动识别的API失败",
-                                         "尝试连接xmutpriu.com的api失败，请检查网络问题，比如关闭梯子。\n"
-                                         '如果仍然连接不上，可能是服务器的问题，请联系"管理员"。')
+                        show_message_box('尝试连接xmutpriu.com的api失败，请检查网络问题，比如关闭梯子。\n'
+                                         '如果仍然连接不上，可能是服务器的问题，请联系"管理员"。',
+                                         'xllabelme标注工具：连接自动识别的API失败')
 
             a = QAction(self.tr('自动识别(xlapi)'), settings_menu)
             a.setCheckable(True)
@@ -400,7 +386,7 @@ class XlMainWindow(MainWindow):
         """ 原版labelme有实现，但这里作了定制修改 """
 
     def saveLabels(self, filename):
-        self.project.saveLabels(filename)
+        return self.project.saveLabels(filename)
 
     def __4_自己扩展的功能(self):
         """ high-level级别的新增api """
@@ -410,9 +396,11 @@ class XlMainWindow(MainWindow):
         mode = self.获取配置('current_mode')
         if not hasattr(self, 'project'):
             self.project = eval(mode)(self)
+            self.open_last_workspace()
         elif self.project.__class__.__name__ != mode:
             self.project.destroy()
             self.project = eval(mode)(self)
+            self.open_last_workspace()
 
     def open_last_workspace(self):
         """ 打开上一次退出软件的工作空间状态 """
@@ -624,8 +612,12 @@ class 原版labelme:
             self.画布右键菜单添加动作('切分该形状', self.split_shape, enabled=False,
                             tip='在当前鼠标点击位置，将一个shape拆成两个shape（注意，该功能会强制拆出两个矩形框）')
         self.画布右键菜单添加动作()
-        self.画布右键菜单添加动作('旋转图片', self.rotate_image,
-                        tip='将图片和当前标注的形状，顺时针旋转90度，可以多次操作调整到合适方向。'
+        self.画布右键菜单添加动作('旋转图片(往左翻⤿)', lambda: self.rotate_image(270),
+                        tip='将图片和当前标注的形状，逆时针旋转90度(左翻)，可以多次操作调整到合适方向。'
+                            '注意1：软件中操作并未改变原始图片，需要保存标注文件后，外部图片文件才会更新。'
+                            '注意2：图片操作目前是撤销不了的，不过可以不保存再重新打开文件恢复初始状态。')
+        self.画布右键菜单添加动作('旋转图片(往右翻⤾)', lambda: self.rotate_image(90),
+                        tip='将图片和当前标注的形状，顺时针旋转90度(右翻)，可以多次操作调整到合适方向。'
                             '注意1：软件中操作并未改变原始图片，需要保存标注文件后，外部图片文件才会更新。'
                             '注意2：图片操作目前是撤销不了的，不过可以不保存再重新打开文件恢复初始状态。')
         # self.画布右键菜单添加动作('歪斜图片矫正', self.deskew_image,
@@ -650,6 +642,64 @@ class 原版labelme:
 
     def __3_修改原版有的接口(self):
         """ 原版labelme有实现，但这里作了定制修改 """
+
+    def should_check_state_for_label_file(self, label_file):
+        """ 根据标签文件决定是否设置复选框状态为已检查
+
+        :param Path label_file: 标签文件的路径
+        :return bool: 如果应设置为已检查则返回True，否则返回False
+        """
+        # return LabelFile.is_label_file(label_file)
+        return XlPath(label_file).read_json()['shapes']
+
+    def importDirImages(self, dirpath, pattern=None, load=True, filename=None, offset=1):
+        QApplication.processEvents()
+
+        mainwin = self.mainwin
+        mainwin.actions.openNextImg.setEnabled(True)
+        mainwin.actions.openPrevImg.setEnabled(True)
+
+        if not mainwin.mayContinue() or not dirpath:
+            return
+
+        mainwin.lastOpenDir = dirpath
+        mainwin.filename = filename
+        mainwin.fileListWidget.clear()
+
+        def read_labels(progress_callback):
+            mainwin.loadedItems = []
+            filenames = mainwin.scanAllImages(dirpath)
+            n = len(filenames)
+            for i, filename in enumerate(filenames, start=1):
+                if pattern and pattern not in filename:
+                    continue
+                label_file = mainwin.get_label_path(filename)
+                # 使用元组代替QListWidgetItem对象
+                item = (filename, label_file.is_file() and self.should_check_state_for_label_file(label_file))
+                mainwin.loadedItems.append(item)  # 存储项到列表中
+                item_widget = QtWidgets.QListWidgetItem(filename)
+                item_widget.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                if item[1]:
+                    item_widget.setCheckState(Qt.Checked)
+                else:
+                    item_widget.setCheckState(Qt.Unchecked)
+                mainwin.fileListWidget.addItem(item_widget)
+                progress_callback(int(i / n * 100))
+
+        if pattern is None:  # 正常读取目录
+            WaitDialog().run_with_progress(read_labels)
+        else:  # TODO 只是检索目录下的文件
+            for item in mainwin.loadedItems:  # 从存储的项中搜索
+                if pattern in item[0]:  # 如果项的文本匹配到搜索的模式
+                    item_widget = QtWidgets.QListWidgetItem(item[0])
+                    item_widget.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                    if item[1]:
+                        item_widget.setCheckState(Qt.Checked)
+                    else:
+                        item_widget.setCheckState(Qt.Unchecked)
+                    mainwin.fileListWidget.addItem(item_widget)  # 将匹配到的项添加到显示的列表中
+
+        mainwin.openNextImg(load=load, offset=offset)
 
     def _get_rgb_by_label(self, label):
         mainwin = self.mainwin
@@ -933,12 +983,15 @@ class 原版labelme:
             self.updateShape(shape, item)
             self.mainwin.setDirty()
 
-    def rotate_image(self):
+    def rotate_image(self, degree=90):
         """ 旋转图片，每次执行顺时针旋转90度 """
 
         def flip_points(sp, h):
             from pyxllib.algo.geo import resort_quad_points
             pts = sp.points
+            if len(pts) < 2:  # 会有特殊情况，只有1个点的（m2305latex2lg）
+                pts.append(pts[0])
+
             if sp.shape_type == 'rectangle':
                 # 矩形要特殊处理，仍然确保第1个点在左上角
                 x1, y1 = pts[0].x(), pts[0].y()
@@ -960,8 +1013,6 @@ class 原版labelme:
                     point.setX(h - point.y())
                     point.setY(x)
 
-        from PyQt5.QtGui import QTransform
-
         # 1 旋转shapes坐标
         mainwin = self.mainwin
         canvas = mainwin.canvas
@@ -973,7 +1024,7 @@ class 原版labelme:
         # 2 旋转图片
         self.updateShapes(shapes)
         transform = QTransform()
-        transform.rotate(90)
+        transform.rotate(degree)
         canvas.pixmap = canvas.pixmap.transformed(transform)
         mainwin.image = canvas.pixmap.toImage()
 
@@ -1029,52 +1080,71 @@ class 原版labelme:
             item.setText(dst + '/' + p.name)
         else:
             item.setText(p.name)
+        self.mainwin.filename = dst_path / p.name
 
         # 6 要重新打开标注文件
         mainwin.openNextImg(_value=False, load=True, offset=0)
 
-    def stat_shapes(self):
-        with WaitMessageBox(self.mainwin, '如果文件较多，需要一些时间，请稍等一会...'):
-            work_dir = XlPath(self.mainwin.lastOpenDir)
-            msg = [f'统计当前工作目录里的信息：{work_dir.as_posix()}\n']
+    def _stat_shape_base(self):
+        def check_point_value(pts):
+            for pt in pts:
+                if max(pt) > 0:
+                    return True
+            return False
 
-            msg.append('零、json中shapes数统计（标注框数）')
-            files = list(work_dir.rglob_files('*.json'))
-            nums = []
-            for f in files:
-                data = f.read_json()
-                nums.append(len(data.get('shapes', [])))
-
+        def fmt(nums):
             t = ValuesStat(nums).summary(['g', '.2f', '.2f', 'g', 'g']).replace('\t', '  ')
             t = t.replace('总和', '框数')
             t = t.replace('总数', 'json文件数量')
-            msg.append(t + '\n')
+            return t
 
-            msg += work_dir.check_size()
+        work_dir = XlPath(self.mainwin.lastOpenDir)
+        msg = [f'统计当前工作目录里的信息：{work_dir.as_posix()}\n']
 
+        msg.append('零、json中shapes数统计（标注框数）')
+        files = list(work_dir.rglob_files('*.json'))
+        nums, nums2 = [], []
+        undo_files = []
+        for f in files:
+            data = f.read_json()
+            shapes = data.get('shapes', [])
+            shapes2 = [x for x in shapes if check_point_value(x['points'])]
+            nums.append(len(shapes))
+            nums2.append(len(shapes2))
+            if len(shapes) != len(shapes2):
+                undo_files.append(f.relpath(work_dir).as_posix())
+
+        if sum(nums) == sum(nums2):
+            msg.append(fmt(nums))
+        else:
+            msg.append('需标注' + fmt(nums))
+            msg.append('已标注' + fmt(nums2))
+            msg.append('未标完的文件如下：')
+            msg += sorted(undo_files, key=natural_sort_key)
+        msg.append('')
+
+        return msg
+
+    def stat_shapes(self):
+        def func():
+            work_dir = XlPath(self.mainwin.lastOpenDir)
+            msg = self._stat_shape_base()
+            msg.append(work_dir.check_size())
+            return msg
+
+        msg = WaitDialog(self.mainwin, '如果文件较多，需要一些时间，请稍等一会...').run(func)
         show_message_box('\n'.join(msg), '统计标注数量', copyable=True)
 
     def stat_shapes2(self):
-        with WaitMessageBox(self.mainwin, '如果文件较多，需要一些时间，请稍等一会...'):
+        def func():
             work_dir = XlPath(self.mainwin.lastOpenDir)
-            msg = [f'统计当前工作目录里的信息：{work_dir.as_posix()}\n']
-
-            msg.append('\n零、json中shapes数统计（标注框数）')
-            files = list(work_dir.rglob_files('*.json'))
-            nums = []
-            for f in files:
-                data = f.read_json()
-                nums.append(len(data.get('shapes', [])))
-
-            t = ValuesStat(nums).summary(['g', '.2f', '.2f', 'g', 'g']).replace('\t', '  ')
-            t = t.replace('总和', '框数')
-            t = t.replace('总数', 'json文件数量')
-            msg.append(t + '\n')
-
+            msg = ['功能解释文档：https://www.yuque.com/xlpr/pyxllib/check_summary'] + self._stat_shape_base()
             t = work_dir.check_summary()
             t = re.sub(r'【.*?】目录检查\s*', '', t)
             msg.append(t)
+            return msg
 
+        msg = WaitDialog(self.mainwin, '如果文件较多，需要一些时间，请稍等一会...').run(func)
         show_message_box('\n'.join(msg), '统计标注数量（完整版）', copyable=True)
 
 
@@ -1326,7 +1396,7 @@ class 增强版xllabelme(原版labelme):
         shape.label = text
         shape.flags = flags
         shape.group_id = group_id
-        mainwin.updateShape(shape, item)
+        self.updateShape(shape, item)
 
         mainwin.setDirty()
         if not mainwin.uniqLabelList.findItemsByLabel(shape.label):
@@ -1564,17 +1634,14 @@ class m2302中科院题库(增强版xllabelme):
         # 1 获得基本内容。如果开了识别接口，要调api。
         mainwin = self.mainwin
         points = [(p.x(), p.y()) for p in shape.points]
-        d = None
+        d = {'line_id': 1, 'content_type': '印刷体', 'content_class': '文本', 'text': ''}
         if mainwin.获取配置('auto_rec_text') and mainwin.xlapi and shape:
             # 识别指定的points区域
-
             im = xlcv.get_sub(mainwin.arr_image, points, warp_quad=True)
             try:
-                d = mainwin.xlapi.priu_api('content_ocr', im, filename=str(mainwin.filename))
+                d = mainwin.xlapi.priu_api('content_ocr', im, filename=str(mainwin.filename), timeout=5)
             except requests.exceptions.ConnectionError:
                 pass
-        if d is None:  # 设默认值
-            d = {'line_id': 1, 'content_type': '印刷体', 'content_class': '文本', 'text': ''}
 
         # 2 获得line_id
         line_id = 1
@@ -1624,7 +1691,7 @@ class m2302中科院题库(增强版xllabelme):
             sp.label = json.dumps(label, ensure_ascii=False)
 
         # 3 更新回数据
-        mainwin.updateShapes([x[0] for x in data])
+        self.updateShapes([x[0] for x in data])
 
     def browser_paper(self):
         """ 将当前标注的text内容拼接并在公式文章渲染网页打开 """
@@ -1767,9 +1834,13 @@ class m2303表格标注二阶段(增强版xllabelme):
         height = bounds[3] - bounds[1]
 
         # 2 图片信息
-        # 表格, 可见横线, 可见竖线, 不可见横线, 不可见竖线
+        # 可见横线, 可见竖线, 不可见横线, 不可见竖线
         mainwin = self.mainwin
-        points = [(p.x(), p.y()) for p in shape.points]
+        points = [[p.x(), p.y()] for p in shape.points]
+        # 为了避免拉出一条没有高度的矩形，做了点特殊处理
+        points[1][0] = max(points[1][0], points[0][0] + 1)
+        points[1][1] = max(points[1][1], points[0][1] + 1)
+
         im = xlcv.get_sub(mainwin.arr_image, points, warp_quad=True)
         im = xlcv.read(im, 0)  # 先转灰度图
         im = xlcv.replace_ground_color(im, 0, 255)  # 然后转白底黑字图
@@ -1823,11 +1894,36 @@ class m2305公式符号标注(增强版xllabelme):
         mainwin = self.mainwin
         self.菜单栏_帮助_添加文档('公式符号标注说明', 'https://www.yuque.com/xlpr/data/sn3uglc7g6l49akv?singleDoc#')
 
+        self.左侧栏菜单添加动作('编辑latex', self.open_latex_webpage,
+                       tip='打开本题原始latex代码网页，可以在网页修改代码错误后提交')
+        self.左侧栏菜单添加动作('重置json', self.reset_json,
+                       tip='从服务器下载新的json文件。注意，这会舍弃这张图原本标注的所有框')
+
+        self.文件列表右键菜单添加动作('移到"错误图"', lambda: self.move_file('错误图'))
+        self.文件列表右键菜单添加动作('移回"正常图"', lambda: self.move_file())
+
         if update:
             mainwin.populateModeActions()
 
     def __3_修改原版有的接口(self):
         """ 原版labelme有实现，但这里作了定制修改 """
+
+    def should_check_state_for_label_file(self, label_file):
+        """ 读取标注文件，看里面是否全部shape都含有位置信息了 """
+        shapes = XlPath(label_file).read_json()['shapes']
+        if not shapes:
+            return False
+
+        for sp in shapes:
+            if sp['shape_type'] == 'rectangle':
+                pts = [tuple(pt) for pt in sp['points']]
+                if len(pts) < 2:
+                    return False
+                pt1, pt2 = pts[:2]
+                if pt1 == pt2:
+                    return False
+
+        return True
 
     def newShape(self):
         """ 这个项目的newShape比较特别，并不实际添加shape，而是把无效的矩形框重新替换标注
@@ -1858,3 +1954,67 @@ class m2305公式符号标注(增强版xllabelme):
         mainwin.actions.undoLastPoint.setEnabled(False)
         mainwin.actions.undo.setEnabled(True)
         mainwin.setDirty()
+
+    def saveLabels(self, filename):
+        mainwin = self.mainwin
+        lf = LabelFile()
+
+        # 1 取出核心数据进行保存
+        # shapes标注数据，用的是labelList里存储的item.shape()
+        shapes = [self.custom_format_shape(item.shape()) for item in mainwin.labelList]
+        flags = {}  # 每张图分类时，每个类别的标记，True或False
+        # 整张图的分类标记
+        for i in range(mainwin.flag_widget.count()):
+            item = mainwin.flag_widget.item(i)
+            key = item.text()
+            flag = item.checkState() == Qt.Checked
+            flags[key] = flag
+        try:
+            imagePath = osp.relpath(mainwin.imagePath, osp.dirname(filename))
+            # 强制不保存 imageData
+            imageData = mainwin.imageData if mainwin._config["store_data"] else None
+            if osp.dirname(filename) and not osp.exists(osp.dirname(filename)):
+                os.makedirs(osp.dirname(filename))
+            lf.save(
+                filename=filename,
+                shapes=shapes,
+                imagePath=imagePath,
+                imageData=imageData,
+                imageHeight=mainwin.image.height(),
+                imageWidth=mainwin.image.width(),
+                otherData=mainwin.otherData,
+                flags=flags,
+            )
+
+            # 2 fileList里可能原本没有标记json文件的，现在可以标记
+            mainwin.labelFile = lf
+            items = mainwin.fileListWidget.findItems(
+                mainwin.get_image_path2(mainwin.imagePath), Qt.MatchExactly
+            )
+            if len(items) > 0:
+                if len(items) != 1:
+                    raise RuntimeError("There are duplicate files.")
+                if self.should_check_state_for_label_file(XlPath(filename)):
+                    items[0].setCheckState(Qt.Checked)
+            # disable allows next and previous image to proceed
+            # self.filename = filename
+            return True
+        except LabelFileError as e:
+            mainwin.errorMessage(
+                mainwin.tr("Error saving label data"), mainwin.tr("<b>%s</b>") % e
+            )
+            return False
+
+    def __4_自己扩展的功能(self):
+        pass
+
+    def open_latex_webpage(self):
+        # todo 前端设计只展示单道题的页面？
+        stem = self.mainwin.filename.stem
+        webbrowser.open(f'https://xmutpriu.com/m2305latex2lg?findname={stem}')
+
+    def reset_json(self):
+        json_file = self.mainwin.get_label_path()
+        response = requests.get(f'https://xmutpriu.com/m2305latex2lg/json/{json_file.stem}')
+        json_file.write_text(response.text)
+        self.mainwin.openNextImg(load=True, offset=0)

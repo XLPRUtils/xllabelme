@@ -155,6 +155,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.fileSearch.setPlaceholderText(self.tr("Search Filename"))
         self.fileSearch.textChanged.connect(self.fileSearchChanged)
         self.fileListWidget = QtWidgets.QListWidget()
+        self.fileListWidget.clicked.connect(lambda: self.fileListWidget.setFocus())  # 聚焦在这里才能用方向键上下切换文件
         self.fileListWidget.itemSelectionChanged.connect(
             self.fileSelectionChanged
         )
@@ -1111,6 +1112,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.settings.setValue('lastFileName', str(filename))
                 self.loadFile(filename)
 
+        self.fileListWidget.setFocus()
+
     # React to canvas signals.
     def shapeSelectionChanged(self, selected_shapes):
         self._noSelectionSlot = True
@@ -1636,7 +1639,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 filename = imageList[currIndex]
             except ValueError:  # 找不到则默认用第1个
                 filename = imageList[0]
-        self.filename = XlPath(self.lastOpenDir, filename)
+        self.filename = XlPath.init(filename, self.lastOpenDir)
         self.settings.setValue('lastOpenDir', self.lastOpenDir)
 
         if self.filename and load:
@@ -1767,8 +1770,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if filename:
             image_path = self.get_image_path2()
             if self.saveLabels(filename):
-                item = self.fileListWidget.findItems(image_path, Qt.MatchExactly)[0]
-                item.setCheckState(Qt.Checked)
+                # item = self.fileListWidget.findItems(image_path, Qt.MatchExactly)[0]
+                # item.setCheckState(Qt.Checked)  # saveLabels已经会设成标记状态，这里不用重复标记
                 self.addRecentFile(filename)
                 self.setClean()
 
@@ -1997,29 +2000,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.openNextImg()
 
     def importDirImages(self, dirpath, pattern=None, load=True, filename=None, offset=1):
-        self.actions.openNextImg.setEnabled(True)
-        self.actions.openPrevImg.setEnabled(True)
-
-        if not self.mayContinue() or not dirpath:
-            return
-
-        self.lastOpenDir = dirpath
-        self.filename = filename
-        self.fileListWidget.clear()
-
-        for filename in self.scanAllImages(dirpath):
-            if pattern and pattern not in filename:
-                continue
-            label_file = self.get_label_path(filename)
-            item = QtWidgets.QListWidgetItem(filename)
-            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-            if label_file.is_file() and LabelFile.is_label_file(label_file):
-                item.setCheckState(Qt.Checked)
-            else:
-                item.setCheckState(Qt.Unchecked)
-            self.fileListWidget.addItem(item)
-
-        self.openNextImg(load=load, offset=offset)
+        self.project.importDirImages(dirpath, pattern, load, filename, offset)
 
     def scanAllImages(self, folderPath):
         extensions = [

@@ -8,10 +8,9 @@ import yaml
 
 import cv2  # 这个库也要打包，所以import进来
 
-# from qtpy import QtCore
-# from qtpy import QtWidgets  # ckz 220831周三14:39，debug模式下运行有问题
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import QCoreApplication
+from PyQt5.QtWidgets import QMessageBox
 
 from xllabelme import __appname__, __version__
 from xllabelme.app import MainWindow
@@ -209,7 +208,8 @@ def main(mainwin=XlMainWindow):
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
-    show_message_box(format_exception(exc_value), '程序遇到了问题，麻烦将这个截图发送给管理员以便他们解决')
+    show_message_box(format_exception(exc_value), '程序遇到了问题，麻烦将这个截图发送给管理员以便他们解决',
+                     icon=QMessageBox.Critical)
 
 
 # this main block is required to generate executable by pyinstaller
