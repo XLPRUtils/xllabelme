@@ -1602,7 +1602,7 @@ class m2302中科院题库(增强版xllabelme):
     def __init__(self, mainwin):
         _attrs = [['line_id', 1, 'int'],
                   ['content_type', 1, 'str', ('印刷体', '手写体')],
-                  ["content_class", 1, "str", ("文本", "公式", "图片", "表格", "删除")],
+                  ["content_class", 1, "str", ("文本", "公式", "图片", "表格", "有机", "删除")],
                   ['text', 1, 'str'],
                   ]
         label_shape_colors = ['content_type,content_class'.split(','),
@@ -1619,6 +1619,7 @@ class m2302中科院题库(增强版xllabelme):
 
         self.左侧栏菜单添加动作('标注排序', self.resort_shapes, tip='重新对目前标注的框进行排序')
         self.左侧栏菜单添加动作('检查全文章', self.browser_paper, tip='将内容按照shapes的顺序拼接成完整的文章，并检查公式渲染效果')
+        self.左侧栏菜单添加动作('批量识别', self.batch_ocr, tip='将内容为__error__的shapes进行重新识别')
         # todo 检查文本行
         # todo 检查小分块
 
@@ -1640,8 +1641,9 @@ class m2302中科院题库(增强版xllabelme):
             im = xlcv.get_sub(mainwin.arr_image, points, warp_quad=True)
             try:
                 d = mainwin.xlapi.priu_api('content_ocr', im, filename=str(mainwin.filename), timeout=5)
-            except requests.exceptions.ConnectionError:
-                pass
+            # except requests.exceptions.ConnectionError:
+            except Exception as e:
+                d = {'line_id': 1, 'content_type': '印刷体', 'content_class': '文本', 'text': '__error__'}
 
         # 2 获得line_id
         line_id = 1
@@ -1722,6 +1724,31 @@ class m2302中科院题库(增强版xllabelme):
         p = XlPath.init(title + '.html', XlPath.tempdir())
         p.write_text(r.text)
         webbrowser.open(p)
+
+    def batch_ocr(self):
+        """ 批量识别 """
+        mainwin = self.mainwin
+        # 目前只用于一个项目
+        if self.获取配置('current_mode') != 'm2302中科院题库':
+            return
+
+        # 0 数据预处理
+        def parse(sp):
+            return [sp, json.loads(sp.label)]
+
+        data = [parse(sp) for sp in mainwin.canvas.shapes]
+
+        # 2 编号重置，改成连续的自然数
+        for item in data:
+            sp, label1 = item[0], item[1]
+            if label1['text'] == '__error__':
+                label2 = json.loads(self.get_default_label(sp))
+                if label2['text'] != '__error__':
+                    label2['line_id'] = label1['line_id']
+                    sp.label = json.dumps(label2, ensure_ascii=False)
+
+        # 3 更新回数据
+        self.updateShapes([x[0] for x in data])
 
 
 class m2303表格标注(原版labelme):

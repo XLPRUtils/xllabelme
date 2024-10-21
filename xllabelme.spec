@@ -15,7 +15,7 @@ a = Analysis(
         ('xllabelme/config/default_config.yaml', 'xllabelme/config'),
         ('xllabelme/icons/*', 'xllabelme/icons'),
     ],
-    hiddenimports=['cython', 'shapely._geos'],
+    hiddenimports=['cython', 'shapely._geos', 'joblib'],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
